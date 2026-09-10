@@ -9,70 +9,77 @@
 [![Rust](https://img.shields.io/badge/Audio%20Core-Rust-red)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-*Satukan seluruh playlist Anda dari Spotify, YouTube Music, dan Apple Music ke dalam pemutaran Hi-Res Lossless TIDAL, nikmati lirik karaoke live, dan sinkronkan sesi Anda di semua perangkat dengan brankas cloud terenkripsi.*
+English | [Bahasa Indonesia](README_ID.md)
+
+<p align="center">
+  <em>Aggregate your fragmented playlists from Spotify, YouTube Music, and Apple Music into high-resolution TIDAL Lossless playback, enjoy real-time karaoke live lyrics, and seamlessly sync your sessions across devices with a zero-knowledge encrypted cloud vault.</em>
+</p>
 
 </div>
 
 ---
 
-## ✨ Fitur Unggulan
+## ✨ Key Features
 
 ### 🔄 Universal Playlist Aggregator & Smart Matcher
-- **Merekap Playlist Tercecer**: Impor dan satukan playlist favorit Anda dari **Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal** ke dalam satu perpustakaan terpadu (*Super-Playlists*).
-- **Audio Up-Resolution**: Lagu-lagu dari playlist Spotify/YT Music secara cerdas dicocokkan via kode ISRC ke katalog **TIDAL HiFi/Master (FLAC Lossless)** untuk kenikmatan audio resolusi tinggi.
+- **Consolidate Fragmented Playlists**: Import and unify your favorite playlists from **Spotify, YouTube Music, Apple Music, TIDAL, and Local Files** into unified "Super-Playlists".
+- **Audio Up-Resolution**: Tracks from Spotify/YT Music playlists are intelligently mapped via ISRC codes to the **TIDAL HiFi/Master (FLAC Lossless)** catalog for audiophile-grade fidelity.
+- **Deduplication & Auto-Sync**: Automatically detects duplicate songs across platforms and keeps playlists in sync.
 
 ### ☁️ WowCloud & Encrypted Credential Vault
-- **Satu Akun untuk Semua**: Cukup login sekali dengan akun WowCloud Anda.
-- **Sinkronisasi Sesi & Kredensial Aman**: Token TIDAL dan sesi streaming terenkripsi secara *client-side* (AES-256-GCM + Argon2id) dan otomatis aktif di semua perangkat Anda (PC, Laptop, HP) tanpa perlu login berulang.
-- **Cross-Device Handoff**: Kendalikan pemutaran di PC/laptop Anda langsung dari smartphone Anda (mirip Spotify Connect).
+- **Single Sign-On (SSO)**: One master cloud account to manage and synchronize your entire music world.
+- **Client-Side Zero-Knowledge Encryption**: Third-party streaming credentials (TIDAL tokens, Spotify sessions) are encrypted client-side using **AES-256-GCM + Argon2id** before cloud synchronization. Even the cloud server cannot read your plain-text tokens.
+- **Cross-Device Handoff**: Control desktop or laptop playback remotely from your mobile device, or seamlessly transfer your playback queue.
 
 ### 🎤 Immersive Live Lyrics Engine
-- **Sinkronisasi Real-Time**: Lirik bergulir halus kata-demi-kata (*karaoke glow*) dan baris-demi-baris bertenaga **LRCLIB** dan **TIDAL Timed Lyrics**.
-- **Desktop Floating Overlay**: Lirik melayang transparan di atas layar kerja Anda saat aplikasi diminimalkan.
-- **Click-to-Seek**: Lompat ke bagian lagu favorit cukup dengan mengklik baris lirik.
+- **Word-by-Word Real-Time Sync**: Smooth karaoke-style word-by-word glow and line-by-line scrolling powered by **LRCLIB** and **TIDAL Timed Lyrics**.
+- **Desktop Floating Overlay**: Minimal translucent widget floating on top of work windows when minimized.
+- **Click-to-Seek & Instrumental Detection**: Jump to any section of the song by tapping lyric lines, with visual indicators for instrumental breaks.
 
 ### 🎛️ Audiophile-Grade Bit-Perfect Engine
-- **Bit-Perfect Output**: Bypass mixer OS untuk audio murni ke DAC eksternal (WASAPI Exclusive, CoreAudio Hog Mode, ALSA Direct).
-- **Dukungan Format Lengkap**: FLAC, ALAC, WAV, DSD, AIFF, MP3, Opus, AAC.
-- **Gapless Playback**: Transisi antar lagu tanpa jeda sunyi (*zero silence gap*).
+- **Bit-Perfect Output**: Bypass operating system audio mixers for pristine delivery to external DACs (WASAPI Exclusive, CoreAudio Hog Mode, ALSA Direct).
+- **Comprehensive Format Support**: FLAC, ALAC, WAV, DSD (DSF/DFF), AIFF, MP3, Opus, AAC.
+- **Gapless Playback**: Zero-silence transitions between consecutive tracks with sample-rate auto-switching.
 
 ---
 
-## 🚀 Memulai (Getting Started)
+## 🚀 Getting Started
 
-### Prasyarat
-- [Rust](https://rustup.rs/) (versi stabil terbaru)
-- [Node.js](https://nodejs.org/) (v18+) & pnpm
-- Dependencies sistem Linux (jika di Linux):
+### Prerequisites
+- [Rust](https://rustup.rs/) (latest stable toolchain)
+- [Node.js](https://nodejs.org/) (v18+) & `pnpm`
+- Linux System Dependencies (if building on Linux):
   ```bash
-  sudo apt install libasound2-dev libpipewire-0.3-dev libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+  sudo apt install libasound2-dev libpipewire-0.3-dev libwebkit2gtk-4.1-dev \
+    build-essential curl wget file libssl-dev libgtk-3-dev \
+    libayatana-appindicator3-dev librsvg2-dev
   ```
 
-### Instalasi & Menjalankan Mode Pengembangan
+### Installation & Development
 ```bash
-# Clone repositori
+# Clone the repository
 git clone https://github.com/inimuqsith/WowMusicPlayer.git
 cd WowMusicPlayer
 
-# Install dependencies frontend
+# Install frontend dependencies
 pnpm install
 
-# Jalankan dalam mode development (Tauri v2)
+# Run in development mode (Tauri v2)
 pnpm tauri dev
 ```
 
 ---
 
-## 🗺️ Roadmap Singkat
-- [x] Perancangan Arsitektur & Spesifikasi Produk (PRD v0.4.0)
-- [ ] Fase 1: Audio Engine Dasar & Pemutar Lokal
-- [ ] Fase 2: Integrasi TIDAL HiFi & Live Lyrics (LRCLIB)
-- [ ] Fase 3: WowCloud Vault & Sinkronisasi Sesi Kredensial (Deploy di `vps-advin`)
-- [ ] Fase 4: Universal Playlist Aggregator (Spotify & YT Music import)
-- [ ] Fase 5: Cross-Device Handoff (Remote Playback Control)
-- [ ] Fase 6: Rilis Cross-Platform Resmi (Desktop & Mobile)
+## 🗺️ Roadmap
+- [x] Architecture Blueprint & Product Requirements (PRD v0.4.0)
+- [ ] Phase 1: Audio Core Engine & Local Playback
+- [ ] Phase 2: TIDAL HiFi Streaming & Live Lyrics (LRCLIB)
+- [ ] Phase 3: WowCloud Vault & Session Sync (Deployment on `vps-advin`)
+- [ ] Phase 4: Universal Playlist Aggregator (Spotify & YT Music import)
+- [ ] Phase 5: Cross-Device Playback Handoff
+- [ ] Phase 6: Production Multiplatform Release (Desktop & Mobile)
 
 ---
 
-## 📄 Lisensi
-Didistribusikan di bawah Lisensi MIT. Lihat `LICENSE` untuk informasi lebih lanjut.
+## 📄 License
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
