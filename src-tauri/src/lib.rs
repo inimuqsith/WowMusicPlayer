@@ -1,17 +1,20 @@
 pub mod aggregator;
 pub mod audio;
+pub mod db;
 pub mod lyrics;
 pub mod vault;
 
 use aggregator::{IsrcMatcher, MatchConfidence, UnifiedTrack};
 use audio::{AudioDeviceInfo, AudioEngine, PlaybackStatus};
+use db::{Database, Playlist, TrackItem};
 use lyrics::{LyricsEngine, LyricsPayload};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
 use vault::{CryptoVault, EncryptedVaultItem};
 
 pub struct AppState {
     pub audio_engine: Arc<AudioEngine>,
+    pub db: Arc<Database>,
 }
 
 #[tauri::command]
@@ -91,15 +94,97 @@ fn match_track_isrc(
     )
 }
 
+// Database IPC commands
+#[tauri::command]
+fn db_get_playlists(state: State<AppState>) -> Result<Vec<Playlist>, String> {
+    state.db.get_playlists().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_create_playlist(
+    state: State<AppState>,
+    title: String,
+    description: Option<String>,
+    cover_url: Option<String>,
+) -> Result<Playlist, String> {
+    state
+        .db
+        .create_playlist(&title, description.as_deref(), cover_url.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_delete_playlist(state: State<AppState>, playlist_id: String) -> Result<bool, String> {
+    state.db.delete_playlist(&playlist_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_get_playlist_tracks(state: State<AppState>, playlist_id: String) -> Result<Vec<TrackItem>, String> {
+    state
+        .db
+        .get_playlist_tracks(&playlist_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_add_track_to_playlist(
+    state: State<AppState>,
+    playlist_id: String,
+    track: TrackItem,
+) -> Result<(), String> {
+    state
+        .db
+        .add_track_to_playlist(&playlist_id, &track)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_remove_track_from_playlist(
+    state: State<AppState>,
+    playlist_id: String,
+    track_id: String,
+) -> Result<(), String> {
+    state
+        .db
+        .remove_track_from_playlist(&playlist_id, &track_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_update_preferred_provider(
+    state: State<AppState>,
+    track_id: String,
+    preferred_provider: String,
+) -> Result<(), String> {
+    state
+        .db
+        .update_preferred_provider(&track_id, &preferred_provider)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app_state = AppState {
-        audio_engine: Arc::new(AudioEngine::new()),
-    };
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(app_state)
+        .setup(|app| {
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let _ = std::fs::create_dir_all(&data_dir);
+            let db_path = data_dir.join("wowmusic_library.db");
+
+            let database = Database::new_at_path(&db_path)
+                .unwrap_or_else(|_| Database::new_in_memory().expect("failed in-memory db fallback"));
+            let _ = database.seed_defaults_if_empty();
+
+            let app_state = AppState {
+                audio_engine: Arc::new(AudioEngine::new()),
+                db: Arc::new(database),
+            };
+            app.manage(app_state);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_audio_devices,
             play_track,
@@ -112,6 +197,13 @@ pub fn run() {
             vault_encrypt,
             vault_decrypt,
             match_track_isrc,
+            db_get_playlists,
+            db_create_playlist,
+            db_delete_playlist,
+            db_get_playlist_tracks,
+            db_add_track_to_playlist,
+            db_remove_track_from_playlist,
+            db_update_preferred_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -18,8 +18,24 @@ import {
   CheckCircle2,
   Cloud,
   Layers,
+  Plus,
+  Trash2,
+  Database,
+  ListMusic,
+  FolderPlus,
+  X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+
+export interface Playlist {
+  id: string;
+  title: string;
+  description?: string;
+  cover_url?: string;
+  track_count: number;
+  created_at: number;
+  updated_at: number;
+}
 
 interface TimedLyricLine {
   timestamp_ms: number;
@@ -37,7 +53,7 @@ interface UnifiedTrackItem {
   id: string;
   title: string;
   artist: string;
-  album: string;
+  album?: string;
   duration_secs: number;
   isrc?: string;
   original_source: "Spotify" | "YouTubeMusic" | "AppleMusic" | "Tidal" | "Local";
@@ -116,6 +132,8 @@ const DEFAULT_LYRICS: TimedLyricLine[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"now-playing" | "aggregator" | "devices" | "vault">("now-playing");
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<string>("default-super-playlist");
   const [tracks, setTracks] = useState<UnifiedTrackItem[]>(SAMPLE_SUPER_PLAYLIST);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -129,6 +147,11 @@ export default function App() {
   const [bitPerfectExclusive, setBitPerfectExclusive] = useState<boolean>(true);
   const [autoSampleRate, setAutoSampleRate] = useState<boolean>(true);
 
+  // Playlist Management Modal
+  const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState<boolean>(false);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>("");
+  const [newPlaylistDesc, setNewPlaylistDesc] = useState<string>("");
+
   // Aggregator inputs
   const [playlistUrlInput, setPlaylistUrlInput] = useState<string>("");
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -140,8 +163,63 @@ export default function App() {
   const [decryptedResult, setDecryptedResult] = useState<string>("");
   const [isVaultBusy, setIsVaultBusy] = useState<boolean>(false);
 
-  const currentTrack = tracks[currentTrackIndex] || tracks[0];
+  const currentTrack = tracks[currentTrackIndex] || tracks[0] || {
+    id: "empty",
+    title: "Belum Ada Lagu",
+    artist: "Pilih atau Tambah Lagu",
+    duration_secs: 0,
+    original_source: "Local",
+    preferred_provider: "Local",
+    cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
+    audio_quality: "None",
+  };
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load playlists from SQLite on mount
+  const loadPlaylists = async () => {
+    try {
+      const list = await invoke<Playlist[]>("db_get_playlists");
+      if (list && list.length > 0) {
+        setPlaylists(list);
+        const targetId = list.some((p) => p.id === activePlaylistId) ? activePlaylistId : list[0].id;
+        setActivePlaylistId(targetId);
+        await loadPlaylistTracks(targetId);
+        return;
+      }
+    } catch (err) {
+      console.warn("Using sample playlist in browser fallback mode:", err);
+    }
+    setPlaylists([
+      {
+        id: "default-super-playlist",
+        title: "Universal Master Hub",
+        description: "A multi-source universal playlist with tracks from Spotify, YouTube Music, TIDAL, and Local FLAC",
+        cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
+        track_count: SAMPLE_SUPER_PLAYLIST.length,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    ]);
+    setActivePlaylistId("default-super-playlist");
+    setTracks(SAMPLE_SUPER_PLAYLIST);
+  };
+
+  const loadPlaylistTracks = async (playlistId: string) => {
+    try {
+      const trks = await invoke<UnifiedTrackItem[]>("db_get_playlist_tracks", { playlistId });
+      if (trks) {
+        setTracks(trks);
+        setCurrentTrackIndex(0);
+        setCurrentTimeMs(0);
+      }
+    } catch (e) {
+      console.warn("Failed to load tracks from db:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadPlaylists();
+  }, []);
 
   // Fetch audio devices from Tauri backend on mount
   useEffect(() => {
@@ -168,6 +246,7 @@ export default function App() {
   // Fetch real-time synced lyrics from Tauri backend (LRCLIB / TIDAL)
   useEffect(() => {
     async function loadLyrics() {
+      if (!currentTrack.title || currentTrack.id === "empty") return;
       try {
         const payload = await invoke<{
           is_synced: boolean;
@@ -247,11 +326,13 @@ export default function App() {
   };
 
   const handleNext = () => {
+    if (tracks.length === 0) return;
     setCurrentTrackIndex((prev) => (prev + 1) % tracks.length);
     setCurrentTimeMs(0);
   };
 
   const handlePrev = () => {
+    if (tracks.length === 0) return;
     setCurrentTrackIndex((prev) => (prev - 1 + tracks.length) % tracks.length);
     setCurrentTimeMs(0);
   };
@@ -263,10 +344,102 @@ export default function App() {
     } catch (e) {}
   };
 
-  const handleImportPlaylist = () => {
+  const handleCreatePlaylist = async () => {
+    if (!newPlaylistTitle.trim()) return;
+    try {
+      const newPl = await invoke<Playlist>("db_create_playlist", {
+        title: newPlaylistTitle.trim(),
+        description: newPlaylistDesc.trim() || null,
+        coverUrl: null,
+      });
+      setPlaylists((prev) => [newPl, ...prev]);
+      setActivePlaylistId(newPl.id);
+      setTracks([]);
+      setIsCreatePlaylistOpen(false);
+      setNewPlaylistTitle("");
+      setNewPlaylistDesc("");
+    } catch (e) {
+      alert("Gagal membuat playlist: " + e);
+    }
+  };
+
+  const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Hapus playlist ini dari database lokal?")) return;
+    try {
+      await invoke("db_delete_playlist", { playlistId: id });
+      const remaining = playlists.filter((p) => p.id !== id);
+      setPlaylists(remaining);
+      if (activePlaylistId === id && remaining.length > 0) {
+        setActivePlaylistId(remaining[0].id);
+        loadPlaylistTracks(remaining[0].id);
+      }
+    } catch (err) {
+      alert("Gagal menghapus playlist: " + err);
+    }
+  };
+
+  const handleAddTrack = async (newTrack: UnifiedTrackItem) => {
+    try {
+      await invoke("db_add_track_to_playlist", {
+        playlistId: activePlaylistId,
+        track: {
+          id: newTrack.id,
+          title: newTrack.title,
+          artist: newTrack.artist,
+          album: newTrack.album || null,
+          duration_secs: newTrack.duration_secs,
+          isrc: newTrack.isrc || null,
+          original_source: newTrack.original_source,
+          preferred_provider: newTrack.preferred_provider,
+          cover_url: newTrack.cover_url || null,
+          audio_quality: newTrack.audio_quality || null,
+          local_path: null,
+        },
+      });
+      await loadPlaylistTracks(activePlaylistId);
+      const list = await invoke<Playlist[]>("db_get_playlists");
+      if (list) setPlaylists(list);
+    } catch (e) {
+      console.warn("Saved to in-memory state:", e);
+      setTracks((prev) => [...prev, newTrack]);
+    }
+  };
+
+  const handleUpdateProvider = async (trackId: string, newProvider: "Spotify" | "YouTubeMusic" | "Tidal" | "Local") => {
+    setTracks((prev) =>
+      prev.map((t) => (t.id === trackId ? { ...t, preferred_provider: newProvider } : t))
+    );
+    try {
+      await invoke("db_update_preferred_provider", {
+        trackId,
+        preferredProvider: newProvider,
+      });
+    } catch (e) {
+      console.warn("Provider update fallback:", e);
+    }
+  };
+
+  const handleRemoveTrack = async (trackId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("db_remove_track_from_playlist", {
+        playlistId: activePlaylistId,
+        trackId,
+      });
+      await loadPlaylistTracks(activePlaylistId);
+      const list = await invoke<Playlist[]>("db_get_playlists");
+      if (list) setPlaylists(list);
+    } catch (err) {
+      console.warn("Remove track fallback:", err);
+      setTracks((prev) => prev.filter((t) => t.id !== trackId));
+    }
+  };
+
+  const handleImportPlaylist = async () => {
     if (!playlistUrlInput.trim()) return;
     setIsImporting(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const src = playlistUrlInput.includes("youtube")
         ? "YouTubeMusic"
         : playlistUrlInput.includes("apple")
@@ -287,7 +460,7 @@ export default function App() {
         cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
         audio_quality: "High Fidelity Stream",
       };
-      setTracks((prev) => [newImported, ...prev]);
+      await handleAddTrack(newImported);
       setPlaylistUrlInput("");
       setIsImporting(false);
     }, 600);
@@ -407,6 +580,60 @@ export default function App() {
           </button>
         </nav>
 
+        {/* SQLite Universal Playlists Hub */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden pt-3 border-t border-zinc-800/80">
+          <div className="flex items-center justify-between px-2 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-cyan-400" />
+              Playlists (SQLite)
+            </span>
+            <button
+              onClick={() => setIsCreatePlaylistOpen(true)}
+              title="Buat Playlist Baru"
+              className="p-1 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 rounded-lg transition-all"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-1 pr-1 text-xs select-none">
+            {playlists.map((pl) => (
+              <div
+                key={pl.id}
+                onClick={() => {
+                  setActivePlaylistId(pl.id);
+                  loadPlaylistTracks(pl.id);
+                  setActiveTab("aggregator");
+                }}
+                className={`group flex items-center justify-between px-2.5 py-2 rounded-xl cursor-pointer transition-all ${
+                  activePlaylistId === pl.id
+                    ? "bg-cyan-500/15 text-cyan-300 font-medium border border-cyan-500/30"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <ListMusic className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{pl.title}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] bg-zinc-800/80 text-zinc-400 font-mono px-1.5 py-0.5 rounded">
+                    {pl.track_count}
+                  </span>
+                  {pl.id !== "default-super-playlist" && (
+                    <button
+                      onClick={(e) => handleDeletePlaylist(pl.id, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 rounded transition-opacity"
+                      title="Hapus Playlist"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Server & VPS Status Badge */}
         <div className="mt-auto p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/60 text-xs">
           <div className="flex items-center justify-between mb-1.5">
@@ -504,13 +731,31 @@ export default function App() {
         {/* VIEW 2: Universal Playlist Aggregator */}
         {activeTab === "aggregator" && (
           <div className="flex-1 flex flex-col p-8 overflow-y-auto max-w-6xl w-full mx-auto space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-                Universal Playlist Aggregator
-              </h2>
-              <p className="text-sm text-zinc-400 mt-1">
-                Satukan playlist Anda dari Spotify, YouTube Music, dan Apple Music. Lagu-lagu akan secara cerdas dicocokkan via ISRC ke katalog TIDAL Lossless FLAC.
-              </p>
+            {/* Active Playlist Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
+                    {playlists.find((p) => p.id === activePlaylistId)?.title || "Universal Super Playlist"}
+                  </h2>
+                  <span className="text-[11px] bg-cyan-500/20 text-cyan-300 font-semibold px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-cyan-400" />
+                    SQLite Persisted
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-400 mt-1">
+                  {playlists.find((p) => p.id === activePlaylistId)?.description ||
+                    "Satukan lagu dari Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal dalam satu antrean utuh dengan kebebasan memilih playback provider."}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsCreatePlaylistOpen(true)}
+                className="px-4 py-2.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-all flex items-center gap-2 self-start md:self-auto shadow-sm"
+              >
+                <FolderPlus className="w-4 h-4 text-cyan-400" />
+                <span>Buat Playlist Baru</span>
+              </button>
             </div>
 
             {/* Importer Box */}
@@ -519,7 +764,7 @@ export default function App() {
                 <Search className="w-5 h-5 text-zinc-400 absolute left-4" />
                 <input
                   type="text"
-                  placeholder="Tempel link playlist Spotify / YouTube Music / Apple Music..."
+                  placeholder="Tempel link lagu/playlist Spotify / YouTube Music / Apple Music..."
                   value={playlistUrlInput}
                   onChange={(e) => setPlaylistUrlInput(e.target.value)}
                   className="w-full bg-transparent pl-12 pr-4 py-3 text-sm focus:outline-none text-zinc-100 placeholder:text-zinc-500"
@@ -528,87 +773,100 @@ export default function App() {
               <button
                 onClick={handleImportPlaylist}
                 disabled={isImporting}
-                className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50 shrink-0"
               >
-                {isImporting ? "Mencocokkan ISRC..." : "Import & Up-Resolve"}
+                {isImporting ? "Menyimpan ke SQLite..." : "Tambah ke Playlist"}
               </button>
             </div>
 
             {/* Aggregated Tracks Table */}
             <div className="border border-zinc-800/80 rounded-2xl overflow-hidden bg-zinc-900/40">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-900/80 text-zinc-400 uppercase text-xs font-semibold border-b border-zinc-800">
-                  <tr>
-                    <th className="px-6 py-4"># Track</th>
-                    <th className="px-6 py-4">Artist & Album</th>
-                    <th className="px-6 py-4">Original Source</th>
-                    <th className="px-6 py-4">Playback Provider (User Choice)</th>
-                    <th className="px-6 py-4">Quality Info</th>
-                    <th className="px-6 py-4 text-right">Durasi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/60">
-                  {tracks.map((t, idx) => (
-                    <tr
-                      key={t.id}
-                      onClick={() => {
-                        setCurrentTrackIndex(idx);
-                        setCurrentTimeMs(0);
-                        setIsPlaying(true);
-                      }}
-                      className={`hover:bg-zinc-800/40 cursor-pointer transition-colors ${
-                        currentTrackIndex === idx ? "bg-cyan-500/10 font-medium" : ""
-                      }`}
-                    >
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <img
-                          src={t.cover_url}
-                          alt={t.title}
-                          className="w-10 h-10 rounded-lg object-cover"
-                        />
-                        <span className="text-zinc-200 font-semibold">{t.title}</span>
-                      </td>
-                      <td className="px-6 py-4 text-zinc-400">
-                        <div>{t.artist}</div>
-                        <div className="text-xs text-zinc-500">{t.album}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
-                          {t.original_source}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={t.preferred_provider}
-                          onChange={(e) => {
-                            const newProvider = e.target.value as any;
-                            setTracks((prev) =>
-                              prev.map((item, i) =>
-                                i === idx ? { ...item, preferred_provider: newProvider } : item
-                              )
-                            );
-                          }}
-                          className="bg-zinc-900 border border-zinc-700 text-cyan-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 cursor-pointer font-medium"
-                        >
-                          <option value="Spotify">Stream: Spotify</option>
-                          <option value="YouTubeMusic">Stream: YouTube Music</option>
-                          <option value="Tidal">Stream: TIDAL HiFi</option>
-                          <option value="Local">Local Storage</option>
-                        </select>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          {t.audio_quality}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono text-zinc-400">
-                        {formatSeconds(t.duration_secs)}
-                      </td>
+              {tracks.length === 0 ? (
+                <div className="p-12 text-center text-zinc-500">
+                  <ListMusic className="w-12 h-12 mx-auto mb-3 text-zinc-600" />
+                  <p className="text-sm font-medium text-zinc-400">Playlist ini masih kosong</p>
+                  <p className="text-xs text-zinc-600 mt-1">
+                    Tempel tautan Spotify, YouTube Music, atau Apple Music di atas untuk menambahkan lagu ke database SQLite.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-900/80 text-zinc-400 uppercase text-xs font-semibold border-b border-zinc-800">
+                    <tr>
+                      <th className="px-6 py-4"># Track</th>
+                      <th className="px-6 py-4">Artist & Album</th>
+                      <th className="px-6 py-4">Original Source</th>
+                      <th className="px-6 py-4">Playback Provider (User Choice)</th>
+                      <th className="px-6 py-4">Quality Info</th>
+                      <th className="px-6 py-4 text-right">Durasi</th>
+                      <th className="px-4 py-4 text-center">Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {tracks.map((t, idx) => (
+                      <tr
+                        key={t.id}
+                        onClick={() => {
+                          setCurrentTrackIndex(idx);
+                          setCurrentTimeMs(0);
+                          setIsPlaying(true);
+                        }}
+                        className={`hover:bg-zinc-800/40 cursor-pointer transition-colors group ${
+                          currentTrackIndex === idx ? "bg-cyan-500/10 font-medium" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-4 flex items-center gap-3">
+                          <img
+                            src={t.cover_url}
+                            alt={t.title}
+                            className="w-10 h-10 rounded-lg object-cover shadow"
+                          />
+                          <span className="text-zinc-200 font-semibold">{t.title}</span>
+                        </td>
+                        <td className="px-6 py-4 text-zinc-400">
+                          <div>{t.artist}</div>
+                          <div className="text-xs text-zinc-500">{t.album || "-"}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
+                            {t.original_source}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={t.preferred_provider}
+                            onChange={(e) => handleUpdateProvider(t.id, e.target.value as any)}
+                            className="bg-zinc-900 border border-zinc-700 text-cyan-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 cursor-pointer font-medium"
+                          >
+                            <option value="Spotify">Stream: Spotify</option>
+                            <option value="YouTubeMusic">Stream: YouTube Music</option>
+                            <option value="Tidal">Stream: TIDAL HiFi</option>
+                            <option value="Local">Local Storage</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {t.audio_quality}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono text-zinc-400">
+                          {formatSeconds(t.duration_secs)}
+                        </td>
+                        <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleRemoveTrack(t.id, e)}
+                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            title="Hapus dari playlist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
@@ -887,6 +1145,73 @@ export default function App() {
           />
         </div>
       </footer>
+
+      {/* Modal: Buat Playlist Baru */}
+      {isCreatePlaylistOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <FolderPlus className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-lg text-zinc-100">Buat Playlist Baru</h3>
+              </div>
+              <button
+                onClick={() => setIsCreatePlaylistOpen(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-200 rounded-lg hover:bg-zinc-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                  Nama Playlist
+                </label>
+                <input
+                  type="text"
+                  placeholder="cth. Nostalgia 90s, Focus Coding, Audiophile Picks..."
+                  value={newPlaylistTitle}
+                  onChange={(e) => setNewPlaylistTitle(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                  Deskripsi (Opsional)
+                </label>
+                <textarea
+                  placeholder="Koleksi lagu campuran antar-provider..."
+                  rows={3}
+                  value={newPlaylistDesc}
+                  onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 resize-none text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsCreatePlaylistOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleCreatePlaylist}
+                disabled={!newPlaylistTitle.trim()}
+                className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-zinc-950 text-xs font-bold rounded-xl transition-all shadow-lg shadow-cyan-500/20"
+              >
+                Simpan Playlist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

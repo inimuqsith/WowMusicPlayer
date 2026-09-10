@@ -161,3 +161,26 @@ Format awal dokumen memori disajikan sebagai ringkasan umum tanpa header per-ent
 ### 3. Dampak Teknis & File Terkait
 - Pembaruan total berkas [MEMORY.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/MEMORY.md) dengan rekonstruksi entri `[MEM-001]` sampai `[MEM-006]`.
 
+---
+
+## [MEM-007] Implementasi SQLite Relasional & Universal Playlist CRUD (Milestone v0.2.0)
+- **Waktu Pencatatan**: 2026-09-10 16:35:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Fitur / Arsitektur / Database
+- **Status**: Implemented (Active)
+
+### 1. Konteks & Latar Belakang
+Sebelumnya antrean lagu dan playlist hanya tersimpan sementara dalam memori frontend (*in-memory*). Pengguna membutuhkan kedaulatan playlist mandiri di mana playlist kustom dan referensi lagu lintas-provider tersimpan secara permanen ke database lokal komputer klien.
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- Mengimplementasikan storage SQLite relasional di layer Rust (`rusqlite` bundled) dengan skema tabel: `playlists`, `tracks`, dan relasi `playlist_tracks`.
+- Setiap lagu menyimpan referensi multi-provider dan opsi `preferred_provider` yang dapat disesuaikan pengguna secara bebas (Spotify, YouTube Music, TIDAL, atau File Lokal).
+- Menambahkan operasi CRUD penuh via Tauri IPC commands (`db_get_playlists`, `db_create_playlist`, `db_delete_playlist`, `db_get_playlist_tracks`, `db_add_track_to_playlist`, `db_remove_track_from_playlist`, `db_update_preferred_provider`).
+- Menambahkan panel Playlist Hub (SQLite) di sidebar, modal interaktif "Buat Playlist Baru", dan penghapusan lagu secara reaktif di antarmuka pengguna.
+
+### 3. Dampak Teknis & File Terkait
+- Penambahan dependensi `rusqlite` & `uuid` di [src-tauri/Cargo.toml](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/Cargo.toml).
+- Modul baru [src-tauri/src/db/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/db/mod.rs) dengan 2 unit test baru (7/7 unit tests PASS).
+- Pendaftaran IPC commands di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
+- Integrasi UI frontend di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+
