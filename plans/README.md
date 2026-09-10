@@ -118,6 +118,5 @@ Daftar spesifik file dan penjelasan singkat perubahan masing-masing file.
 ### 💡 Draf Rencana Masa Depan (Drafts)
 | ID | Judul Plan | Kategori | Lokasi Berkas |
 | :--- | :--- | :--- | :--- |
-| **PLAN-004** | Local Audio File Importer & Tag Metadata Reader | Audio Core | [`plans/drafts/PLAN-004-local-audio-file-importer.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/drafts/PLAN-004-local-audio-file-importer.md) |
-| **PLAN-005** | WowCloud Encrypted Vault Sync (AES-256-GCM) | Cloud Sync | [`plans/drafts/PLAN-005-wowcloud-vault-sync.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/drafts/PLAN-005-wowcloud-vault-sync.md) |
-| **PLAN-006** | Cross-Device Handoff via WebSocket | Platform | [`plans/drafts/PLAN-006-cross-device-handoff.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/drafts/PLAN-006-cross-device-handoff.md) |
+| **PLAN-004** | Expanded Now Playing Fullscreen & Bottom Bar Lyrics | UI/UX | [`plans/drafts/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/drafts/PLAN-004-expanded-player-and-bottom-bar-lyrics.md) |
+
