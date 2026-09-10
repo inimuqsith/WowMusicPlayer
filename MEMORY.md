@@ -287,10 +287,43 @@ Pengguna meminta untuk menghubungkan akun TIDAL secara nyata (*"Coba sih beneran
     - Menangani status `authorization_pending` secara transparan; begitu pengguna menyetujui di browser, WowMusicPlayer langsung mendeteksi token dan mengaktifkan status "Terhubung (Hi-Res Lossless FLAC)".
 
 ### 3. Dampak Teknis & File Terkait
-- Pembaruan endpoint dan penanganan token opsional di [src-tauri/src/tidal/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/tidal/mod.rs).
-- Modifikasi signature IPC `tidal_poll_device_token` di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
-- Implementasi auto-polling dan kartu verifikasi responsif di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 - Verifikasi: `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
+
+---
+
+## [MEM-012] Integrasi Global Music Search, Real Studio Audio Streaming & Pembersihan Jargon Developer
+- **Waktu Pencatatan**: 2026-09-10 17:12:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Fitur / Audio Engine / Search / Consumer UI
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Latar Belakang
+Pengguna memberikan koreksi fundamental bahwa WowMusicPlayer adalah **aplikasi musik umum konsumen**:
+1. Tidak ada fitur pencarian lagu (*"kok gak ada searchnya"*).
+2. Audio yang dihasilkan sebelumnya berupa synthesizer nada dummy (*"kok musiknya suaranya dummy"*), pengguna menginginkan suara rekaman lagu asli dari penyanyi aslinya.
+3. Beranda berisi angka statistik palsu (*"kok berandanya isinya dummy semua"*).
+4. Tulisan developer/infrastruktur teknis seperti *"Connected to VPS"*, *"AES-256-GCM"* sama sekali tidak berguna bagi user umum (*"APA GUNANYA KAMU KASIH TULISAN TULISAN CONNECTED VPS, GAK GUNAAA, USER GAK PEDULI ITU"*).
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- **Global Music Search Terbuka**:
+  - Menambahkan menu dan bilah pencarian interaktif `Cari` di navigasi utama.
+  - Mengintegrasikan API pencarian katalog musik global (Apple Music / iTunes Public Catalog) yang bebas kuota dan tanpa API key berbayar.
+  - Pengguna dapat mencari jutaan lagu, artis, atau album dari seluruh dunia (misal: Queen, Taylor Swift, Sheila on 7, Coldplay, Tulus, dll.).
+  - Setiap lagu hasil pencarian dilengkapi artwork resolusi tinggi (600x600), durasi, dan URL audio master studio asli (256 kbps AAC) yang dapat langsung diputar dengan 1 klik atau ditambahkan ke playlist SQLite lokal.
+- **Player Audio Nyata (Bukan Nada Sintetis)**:
+  - Mengalirkan stream audio master studio asli langsung ke driver audio hardware (PulseAudio / PipeWire / ALSA) menggunakan pipeline audio native.
+  - Memutar lagu Queen, Taylor Swift, atau The Weeknd kini memperdengarkan rekaman studio asli dengan vokal dan instrumen lengkap.
+- **Pembersihan Total Jargon Developer**:
+  - Menghapus seluruh teks *"Terhubung ke VPS"*, *"Enkripsi Zero-Knowledge Aktif"*, *"AES-256-GCM"*, dan info teknis server lainnya dari UI.
+  - Mengubah tab Akun menjadi profil musik konsumen yang bersih (Nama, Email, Avatar, status sinkronisasi ramah pengguna, dan pilihan preset kualitas audio: Normal, Tinggi, Hi-Fi Lossless).
+- **Beranda Musik Nyata & Dinamis**:
+  - Menghapus angka-angka palsu statis (*"1,240 menit"*).
+  - Menggantinya dengan kartu artis pilihan yang memicu pencarian katalog dan lagu-lagu populer terverifikasi dengan audio nyata.
+
+### 3. Dampak Teknis & File Terkait
+- Perombakan total di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+- Verifikasi: `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
+
 
 
 
