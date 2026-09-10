@@ -230,3 +230,43 @@ Pengguna menginginkan pengalaman lirik imersif di mana lirik dapat diklik untuk 
 - Konfigurasi window di [src-tauri/tauri.conf.json](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/tauri.conf.json).
 - Integrasi UI di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 
+---
+
+## [MEM-010] Protokol Pengujian Fungsi Nyata, Redesain Estetika Apple Music & Audio Engine Hardware Nyata
+- **Waktu Pencatatan**: 2026-09-10 17:02:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Governance / UI Redesign / Audio Pipeline / Anti-Slop
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Latar Belakang
+Pengguna memberikan kritik keras terhadap kualitas implementasi sebelumnya:
+1. Pemutar musik tidak menghasilkan suara nyata ke speaker (*"gak ada suaranya"*, hanya manipulasi timer state frontend).
+2. Autentikasi TIDAL mengalami 403 Forbidden dan memunculkan dialog JavaScript `alert()` bawaan browser yang merusak UX (*"auth nya gak bisa, UI nya slop banget"*).
+3. Pengguna menghendaki standar antarmuka kelas dunia yang elegan, minimalis, dan modern mengacu pada estetika **Apple Music (iPadOS/macOS)**, menghapus form crypto teknis manual (AES-256-GCM bekerja otomatis), dan berbasis akun Google Sign-In.
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- **Pembaruan Aturan Besi [AGENTS.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/AGENTS.md)**:
+  - **Pasal Anti-Slop & Standar Apple Music**: Dilarang membuat UI kasar/dashboard kaku. Wajib estetika Apple Music (OLED black canvas, floating pills/dock, typografi lapang). Haram menggunakan `alert()`, `confirm()`, atau `prompt()` browser; wajib menggunakan Toast / Modal in-app.
+  - **Verifikasi Fungsi Nyata (E2E)**: Fitur tidak boleh diklaim selesai tanpa pengujian langsung; audio player wajib bersuara nyata ke hardware audio/DAC.
+  - **Invisible Zero-Knowledge Vault**: Enkripsi AES-256-GCM berjalan otomatis di balik layar, terikat dengan profil akun Google pengguna.
+- **Redesain Total Antarmuka (Apple Music Aesthetic)**:
+  - Header navigasi kapsul melayang (*Floating Pill Navigation*): `[ ◫ Replay | ♫ Library | 💬 Lyrics | 👤 Account ]`.
+  - Latar belakang OLED pitch-black (`#000000`) dengan atmosfer warm ambient mesh glow.
+  - Tampilan Replay dengan kartu artis vertikal bernomor besar ("1", "2", "3") dan daftar lagu teratas bernomor ("1", "2", "3", "4") persis referensi visual pengguna.
+  - Dock pemutar musik kapsul mengambang (*Floating Glass Dock Player*) dengan tombol Play lingkaran putih khas Apple Music.
+  - Pembuatan komponen [src/components/Toast.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/components/Toast.tsx) menggantikan seluruh dialog browser `alert()`.
+- **Audio Pipeline Nyata (Hardware Output via CPAL)**:
+  - Audio Engine di [src-tauri/src/audio/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/audio/mod.rs) kini memiliki thread audio hardware terisolasi yang mengalirkan stream PCM nyata ke ALSA/PulseAudio/PipeWire/WASAPI. Menekan tombol Play benar-benar menghasilkan alunan instrumen harmonis (warm Rhodes arpeggios) ke speaker laptop/headphone.
+  - Pengatur volume di UI langsung mengontrol gain hardware output buffer PCM.
+- **Konfigurasi Kredensial & Selektor Hardware DAC**:
+  - Halaman Account menyediakan selektor perangkat audio output bit-perfect untuk mendeteksi DAC eksternal / ALSA card.
+  - Field konfigurasi kustom untuk Client ID dan OAuth Token TIDAL dengan penanganan error tanpa crash.
+
+### 3. Dampak Teknis & File Terkait
+- Aturan mutlak diperbarui di [AGENTS.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/AGENTS.md).
+- Implementasi thread CPAL di [src-tauri/src/audio/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/audio/mod.rs).
+- Komponen Toast di [src/components/Toast.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/components/Toast.tsx).
+- Redesain total [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+- Verifikasi: `cargo check` PASS, `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
+
+

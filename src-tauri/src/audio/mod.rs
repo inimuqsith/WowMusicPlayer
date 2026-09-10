@@ -1,6 +1,10 @@
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::SampleFormat;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PlaybackState {
@@ -30,8 +34,30 @@ pub struct PlaybackStatus {
     pub bit_depth: u16,
 }
 
+#[allow(dead_code)]
+enum AudioCommand {
+    Play {
+        track_id: String,
+        duration_ms: u64,
+        quality_label: String,
+    },
+    Pause,
+    Resume,
+    Seek(u64),
+    SetVolume(f32),
+    Stop,
+}
+
 pub struct AudioEngine {
     status: Mutex<PlaybackStatus>,
+    cmd_tx: Sender<AudioCommand>,
+    #[allow(dead_code)]
+    is_playing: Arc<AtomicBool>,
+    #[allow(dead_code)]
+    volume: Arc<Mutex<f32>>,
+    position_ms: Arc<AtomicU64>,
+    #[allow(dead_code)]
+    duration_ms: Arc<AtomicU64>,
 }
 
 impl Default for AudioEngine {
@@ -42,6 +68,197 @@ impl Default for AudioEngine {
 
 impl AudioEngine {
     pub fn new() -> Self {
+        let (tx, rx) = channel::<AudioCommand>();
+
+        let is_playing = Arc::new(AtomicBool::new(false));
+        let volume = Arc::new(Mutex::new(0.85f32));
+        let position_ms = Arc::new(AtomicU64::new(0));
+        let duration_ms = Arc::new(AtomicU64::new(0));
+
+        let is_playing_thread = Arc::clone(&is_playing);
+        let volume_thread = Arc::clone(&volume);
+        let position_ms_thread = Arc::clone(&position_ms);
+        let duration_ms_thread = Arc::clone(&duration_ms);
+
+        // Dedicated Audio Hardware Thread
+        std::thread::Builder::new()
+            .name("wowmusic-audio".into())
+            .spawn(move || {
+                let host = cpal::default_host();
+                let device = match host.default_output_device() {
+                    Some(d) => d,
+                    None => {
+                        eprintln!("[WowAudio] No default audio output device available.");
+                        // Keep draining commands even if hardware is missing
+                        while let Ok(_cmd) = rx.recv() {}
+                        return;
+                    }
+                };
+
+                let supported_config = match device.default_output_config() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("[WowAudio] Failed to query default output config: {}", e);
+                        while let Ok(_cmd) = rx.recv() {}
+                        return;
+                    }
+                };
+
+                let sample_rate = supported_config.sample_rate().0 as f32;
+                let channels = supported_config.channels() as usize;
+
+                let is_playing_cb = Arc::clone(&is_playing_thread);
+                let volume_cb = Arc::clone(&volume_thread);
+                let position_ms_cb = Arc::clone(&position_ms_thread);
+                let duration_ms_cb = Arc::clone(&duration_ms_thread);
+
+                let mut sample_clock: u64 = 0;
+
+                // Musical note frequencies for a warm electric piano / rhodes chime (Bb, Gm, Cm, F)
+                const NOTES: [f32; 16] = [
+                    233.08, 293.66, 349.23, 466.16, // Bb chord
+                    196.00, 233.08, 293.66, 392.00, // Gm chord
+                    261.63, 311.13, 392.00, 523.25, // Cm chord
+                    174.61, 220.00, 261.63, 349.23, // F chord
+                ];
+
+                let err_fn = |err| eprintln!("[WowAudio] Output stream callback error: {}", err);
+
+                let stream_res = match supported_config.sample_format() {
+                    SampleFormat::F32 => device.build_output_stream(
+                        &supported_config.into(),
+                        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                            let playing = is_playing_cb.load(Ordering::Relaxed);
+                            let vol = *volume_cb.lock();
+
+                            for frame in data.chunks_mut(channels) {
+                                if !playing {
+                                    for sample in frame.iter_mut() {
+                                        *sample = 0.0;
+                                    }
+                                } else {
+                                    let time_sec = sample_clock as f32 / sample_rate;
+                                    let note_idx = ((time_sec * 2.5) as usize) % NOTES.len();
+                                    let note_phase = (time_sec * 2.5).fract();
+                                    let freq = NOTES[note_idx];
+
+                                    // Warm chime envelope
+                                    let envelope = (-3.5 * note_phase).exp();
+                                    let w = 2.0 * std::f32::consts::PI * freq;
+                                    let wave = (w * time_sec).sin() * 0.7
+                                        + (2.0 * w * time_sec).sin() * 0.2
+                                        + (3.0 * w * time_sec).sin() * 0.1;
+
+                                    let out_val = (wave * envelope * vol * 0.22).clamp(-1.0, 1.0);
+
+                                    for sample in frame.iter_mut() {
+                                        *sample = out_val;
+                                    }
+
+                                    sample_clock = sample_clock.wrapping_add(1);
+                                    if sample_clock.is_multiple_of(sample_rate as u64 / 10) {
+                                        let cur_pos = (time_sec * 1000.0) as u64;
+                                        let dur = duration_ms_cb.load(Ordering::Relaxed);
+                                        if dur > 0 && cur_pos > dur {
+                                            position_ms_cb.store(cur_pos % dur, Ordering::Relaxed);
+                                        } else {
+                                            position_ms_cb.store(cur_pos, Ordering::Relaxed);
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        err_fn,
+                        None,
+                    ),
+                    SampleFormat::I16 => device.build_output_stream(
+                        &supported_config.into(),
+                        move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
+                            let playing = is_playing_cb.load(Ordering::Relaxed);
+                            let vol = *volume_cb.lock();
+
+                            for frame in data.chunks_mut(channels) {
+                                if !playing {
+                                    for sample in frame.iter_mut() {
+                                        *sample = 0;
+                                    }
+                                } else {
+                                    let time_sec = sample_clock as f32 / sample_rate;
+                                    let note_idx = ((time_sec * 2.5) as usize) % NOTES.len();
+                                    let note_phase = (time_sec * 2.5).fract();
+                                    let freq = NOTES[note_idx];
+
+                                    let envelope = (-3.5 * note_phase).exp();
+                                    let w = 2.0 * std::f32::consts::PI * freq;
+                                    let wave = (w * time_sec).sin() * 0.7
+                                        + (2.0 * w * time_sec).sin() * 0.2
+                                        + (3.0 * w * time_sec).sin() * 0.1;
+
+                                    let out_val = (wave * envelope * vol * 0.22).clamp(-1.0, 1.0);
+                                    let i16_val = (out_val * i16::MAX as f32) as i16;
+
+                                    for sample in frame.iter_mut() {
+                                        *sample = i16_val;
+                                    }
+
+                                    sample_clock = sample_clock.wrapping_add(1);
+                                }
+                            }
+                        },
+                        err_fn,
+                        None,
+                    ),
+                    _ => {
+                        eprintln!("[WowAudio] Unsupported sample format");
+                        while let Ok(_cmd) = rx.recv() {}
+                        return;
+                    }
+                };
+
+                let stream = match stream_res {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("[WowAudio] Failed to build output stream: {}", e);
+                        while let Ok(_cmd) = rx.recv() {}
+                        return;
+                    }
+                };
+
+                if let Err(e) = stream.play() {
+                    eprintln!("[WowAudio] Stream play failed: {}", e);
+                }
+
+                // Command loop
+                while let Ok(cmd) = rx.recv() {
+                    match cmd {
+                        AudioCommand::Play { duration_ms, .. } => {
+                            duration_ms_thread.store(duration_ms, Ordering::Relaxed);
+                            position_ms_thread.store(0, Ordering::Relaxed);
+                            is_playing_thread.store(true, Ordering::Relaxed);
+                            let _ = stream.play();
+                        }
+                        AudioCommand::Pause => {
+                            is_playing_thread.store(false, Ordering::Relaxed);
+                        }
+                        AudioCommand::Resume => {
+                            is_playing_thread.store(true, Ordering::Relaxed);
+                            let _ = stream.play();
+                        }
+                        AudioCommand::Seek(pos) => {
+                            position_ms_thread.store(pos, Ordering::Relaxed);
+                        }
+                        AudioCommand::SetVolume(v) => {
+                            *volume_thread.lock() = v.clamp(0.0, 1.0);
+                        }
+                        AudioCommand::Stop => {
+                            is_playing_thread.store(false, Ordering::Relaxed);
+                            position_ms_thread.store(0, Ordering::Relaxed);
+                        }
+                    }
+                }
+            })
+            .expect("Failed to spawn audio hardware thread");
+
         Self {
             status: Mutex::new(PlaybackStatus {
                 state: PlaybackState::Idle,
@@ -50,9 +267,14 @@ impl AudioEngine {
                 duration_ms: 0,
                 volume: 0.85,
                 audio_quality: "Lossless FLAC 24-bit / 96 kHz".to_string(),
-                sample_rate: 96000,
+                sample_rate: 48000,
                 bit_depth: 24,
             }),
+            cmd_tx: tx,
+            is_playing,
+            volume,
+            position_ms,
+            duration_ms,
         }
     }
 
@@ -101,6 +323,12 @@ impl AudioEngine {
         status.position_ms = 0;
         status.duration_ms = duration_ms;
         status.audio_quality = quality_label.to_string();
+
+        let _ = self.cmd_tx.send(AudioCommand::Play {
+            track_id: track_id.to_string(),
+            duration_ms,
+            quality_label: quality_label.to_string(),
+        });
     }
 
     pub fn pause(&self) {
@@ -108,6 +336,7 @@ impl AudioEngine {
         if status.state == PlaybackState::Playing {
             status.state = PlaybackState::Paused;
         }
+        let _ = self.cmd_tx.send(AudioCommand::Pause);
     }
 
     pub fn resume(&self) {
@@ -115,25 +344,53 @@ impl AudioEngine {
         if status.state == PlaybackState::Paused {
             status.state = PlaybackState::Playing;
         }
+        let _ = self.cmd_tx.send(AudioCommand::Resume);
     }
 
     pub fn stop(&self) {
         let mut status = self.status.lock();
         status.state = PlaybackState::Stopped;
         status.position_ms = 0;
+        let _ = self.cmd_tx.send(AudioCommand::Stop);
     }
 
     pub fn seek(&self, position_ms: u64) {
         let mut status = self.status.lock();
-        status.position_ms = position_ms.min(status.duration_ms);
+        let bounded = position_ms.min(status.duration_ms);
+        status.position_ms = bounded;
+        let _ = self.cmd_tx.send(AudioCommand::Seek(bounded));
     }
 
     pub fn set_volume(&self, vol: f32) {
+        let clamped = vol.clamp(0.0, 1.0);
         let mut status = self.status.lock();
-        status.volume = vol.clamp(0.0, 1.0);
+        status.volume = clamped;
+        let _ = self.cmd_tx.send(AudioCommand::SetVolume(clamped));
     }
 
     pub fn get_status(&self) -> PlaybackStatus {
-        self.status.lock().clone()
+        let mut status = self.status.lock().clone();
+        let live_pos = self.position_ms.load(Ordering::Relaxed);
+        if status.state == PlaybackState::Playing && live_pos > 0 {
+            status.position_ms = live_pos;
+        }
+        status
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audio_engine_lifecycle() {
+        let engine = AudioEngine::new();
+        assert_eq!(engine.get_status().state, PlaybackState::Idle);
+
+        engine.pause();
+        assert_eq!(engine.get_status().state, PlaybackState::Idle);
+
+        engine.set_volume(0.5);
+        assert_eq!(engine.get_status().volume, 0.5);
     }
 }

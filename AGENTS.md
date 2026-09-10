@@ -25,6 +25,16 @@ Dokumen ini adalah pedoman operasional mutlak bagi AI Agent (Antigravity, Cursor
 > 3. **Eksekusi Terkendali Sesuai Plan**:
 >    - Kerjakan implementasi secara disiplin hanya mengikuti poin-poin yang disetujui.
 >    - Jika di tengah jalan ditemukan kendala teknis atau kebutuhan baru di luar cakupan plan, **BERHENTI SEGERA**, lalu ajukan revisi plan kepada pengguna untuk ditinjau ulang.
+>
+> 4. **WAJIB Verifikasi Fungsi Nyata (Real End-to-End Testing - NO FAKE / NO SLOP)**:
+>    - **Dilarang Keras Klaim Palsu**: Dilarang mengklaim fitur selesai hanya karena kode lulus `cargo check` atau sekadar timer `setInterval` palsu di frontend.
+>    - **Audio Wajib Bersuara Nyata**: Modul audio wajib mengalirkan sampel PCM nyata ke hardware output (ALSA / PulseAudio / PipeWire / WASAPI / CoreAudio) via `cpal` & `symphonia`. Suara harus benar-benar terdengar dari speaker/headphone pengguna saat tombol Play ditekan.
+>    - **Standar UI Apple Music / Hi-Fi Premium (Zero-Slop)**:
+>      - **Haram Menggunakan Dialog Browser**: DILARANG KERAS menggunakan `alert()`, `confirm()`, atau `prompt()` bawaan browser.
+>      - Seluruh feedback (sukses/gagal/peringatan) wajib menggunakan **In-App Toast** atau Modal modern yang terintegrasi (Lucide icons, dark glassmorphism, Framer Motion).
+>      - Desain antarmuka wajib mengacu pada estetika **Apple Music / Modern Hi-Fi**: Canvas hitam pekat OLED (`#000000`), ambient glow halus, floating glass capsule/dock controls, typografi tajam dan lapang, serta bebas dari developer clutter/form teknis kriptografi yang membingungkan.
+>      - Enkripsi Vault (AES-256-GCM) wajib bekerja otomatis di latar belakang (*invisible zero-knowledge*), berbasis akun (Google Sign-In).
+>    - **Pengujian Nyata Sebelum Menutup Task**: Wajib memverifikasi aplikasi secara live di desktop sebelum menyatakan milestone selesai.
 
 ---
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
   Pause,
@@ -9,24 +9,22 @@ import {
   Shuffle,
   Repeat,
   Sparkles,
-  Music,
-  Speaker,
-  ShieldCheck,
-  Search,
-  Lock,
-  Radio,
   CheckCircle2,
   Cloud,
-  Layers,
   Plus,
   Trash2,
-  Database,
   ListMusic,
-  FolderPlus,
   X,
   PictureInPicture2,
+  MessageSquare,
+  User,
+  ChevronRight,
+  ShieldCheck,
+  Disc3,
+  ExternalLink,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { ToastContainer, ToastMessage } from "./components/Toast";
 
 export interface Playlist {
   id: string;
@@ -63,133 +61,159 @@ interface UnifiedTrackItem {
   audio_quality: string;
 }
 
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url: string;
+  is_signed_in: boolean;
+  cloud_synced: boolean;
+  active_devices: number;
+}
+
 const SAMPLE_SUPER_PLAYLIST: UnifiedTrackItem[] = [
   {
     id: "sp-1",
     title: "Bohemian Rhapsody",
     artist: "Queen",
-    album: "A Night at the Opera",
+    album: "A Night at the Opera (Remastered)",
     duration_secs: 354,
     isrc: "GBUM71029604",
     original_source: "Spotify",
-    preferred_provider: "Spotify",
-    cover_url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80",
-    audio_quality: "Spotify Premium (320 kbps)",
+    preferred_provider: "Tidal",
+    cover_url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
+    audio_quality: "Lossless FLAC 24-bit / 96 kHz",
   },
   {
-    id: "yt-2",
-    title: "Starboy",
-    artist: "The Weeknd, Daft Punk",
-    album: "Starboy",
-    duration_secs: 230,
-    isrc: "USUM71607007",
-    original_source: "YouTubeMusic",
-    preferred_provider: "YouTubeMusic",
-    cover_url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80",
-    audio_quality: "YouTube Audio (Opus 160 kbps)",
-  },
-  {
-    id: "am-3",
+    id: "sp-2",
     title: "Blinding Lights",
     artist: "The Weeknd",
     album: "After Hours",
     duration_secs: 200,
     isrc: "USUG11904206",
-    original_source: "AppleMusic",
-    preferred_provider: "Tidal",
-    cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
-    audio_quality: "TIDAL HiFi (Lossless FLAC)",
+    original_source: "YouTubeMusic",
+    preferred_provider: "Spotify",
+    cover_url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
+    audio_quality: "Hi-Res Lossless 24-bit / 192 kHz",
   },
   {
-    id: "loc-4",
+    id: "sp-3",
+    title: "Cruel Summer",
+    artist: "Taylor Swift",
+    album: "Lover",
+    duration_secs: 178,
+    isrc: "USUG11901472",
+    original_source: "AppleMusic",
+    preferred_provider: "Tidal",
+    cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
+    audio_quality: "Lossless ALAC 24-bit / 48 kHz",
+  },
+  {
+    id: "sp-4",
     title: "Hotel California (Live)",
     artist: "Eagles",
     album: "Hell Freezes Over",
     duration_secs: 432,
-    isrc: "USEE19400001",
     original_source: "Local",
     preferred_provider: "Local",
-    cover_url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&auto=format&fit=crop&q=80",
-    audio_quality: "Local Storage (FLAC 24-bit / 96 kHz)",
+    cover_url: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80",
+    audio_quality: "Bit-Perfect Direct DSD 64",
+  },
+  {
+    id: "sp-5",
+    title: "vampire",
+    artist: "Olivia Rodrigo",
+    album: "GUTS",
+    duration_secs: 219,
+    isrc: "USUG12304910",
+    original_source: "Spotify",
+    preferred_provider: "Spotify",
+    cover_url: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80",
+    audio_quality: "Lossless FLAC 24-bit / 48 kHz",
   },
 ];
 
 const DEFAULT_LYRICS: TimedLyricLine[] = [
   { timestamp_ms: 0, text: "Is this the real life?" },
-  { timestamp_ms: 4200, text: "Is this just fantasy?" },
+  { timestamp_ms: 4500, text: "Is this just fantasy?" },
   { timestamp_ms: 8500, text: "Caught in a landslide, no escape from reality" },
-  { timestamp_ms: 15100, text: "Open your eyes, look up to the skies and see" },
-  { timestamp_ms: 22800, text: "I'm just a poor boy, I need no sympathy" },
-  { timestamp_ms: 29400, text: "Because I'm easy come, easy go, little high, little low" },
-  { timestamp_ms: 37200, text: "Any way the wind blows doesn't really matter to me, to me" },
-  { timestamp_ms: 48000, text: "Mama, just killed a man" },
-  { timestamp_ms: 54300, text: "Put a gun against his head, pulled my trigger, now he's dead" },
-  { timestamp_ms: 61800, text: "Mama, life had just begun" },
-  { timestamp_ms: 67200, text: "But now I've gone and thrown it all away" },
-  { timestamp_ms: 74500, text: "Mama, ooh, didn't mean to make you cry" },
-  { timestamp_ms: 82100, text: "If I'm not back again this time tomorrow" },
-  { timestamp_ms: 87800, text: "Carry on, carry on as if nothing really matters" },
+  { timestamp_ms: 15500, text: "Open your eyes, look up to the skies and see" },
+  { timestamp_ms: 24000, text: "I'm just a poor boy, I need no sympathy" },
+  { timestamp_ms: 30000, text: "Because I'm easy come, easy go, little high, little low" },
+  { timestamp_ms: 38000, text: "Any way the wind blows doesn't really matter to me, to me" },
+  { timestamp_ms: 49000, text: "Mama, just killed a man" },
+  { timestamp_ms: 55000, text: "Put a gun against his head, pulled my trigger, now he's dead" },
+  { timestamp_ms: 63000, text: "Mama, life had just begun" },
+  { timestamp_ms: 69000, text: "But now I've gone and thrown it all away" },
+  { timestamp_ms: 76000, text: "Mama, ooh, didn't mean to make you cry" },
+  { timestamp_ms: 84000, text: "If I'm not back again this time tomorrow" },
+  { timestamp_ms: 89000, text: "Carry on, carry on as if nothing really matters" },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"now-playing" | "aggregator" | "devices" | "vault">("now-playing");
+  // Navigation: "home" (Apple Music Replay style), "library", "lyrics", "account"
+  const [activeTab, setActiveTab] = useState<"home" | "library" | "lyrics" | "account">("home");
+
+  // Playlists & Tracks
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [activePlaylistId, setActivePlaylistId] = useState<string>("default-super-playlist");
+  const [activePlaylistId, setActivePlaylistId] = useState<string>("");
   const [tracks, setTracks] = useState<UnifiedTrackItem[]>(SAMPLE_SUPER_PLAYLIST);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTimeMs, setCurrentTimeMs] = useState<number>(15500);
-  const [volume, setVolume] = useState<number>(0.85);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [lyrics, setLyrics] = useState<TimedLyricLine[]>(DEFAULT_LYRICS);
-  const [lyricsSource, setLyricsSource] = useState<string>("LRCLIB (Synced 60 FPS)");
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+  // Playback State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [volume, setVolume] = useState(0.85);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [isRepeat, setIsRepeat] = useState(false);
+
+  // Audio Devices
   const [audioDevices, setAudioDevices] = useState<AudioDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const [bitPerfectExclusive, setBitPerfectExclusive] = useState<boolean>(true);
-  const [autoSampleRate, setAutoSampleRate] = useState<boolean>(true);
 
-  // Playlist Management Modal
-  const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState<boolean>(false);
-  const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>("");
-  const [newPlaylistDesc, setNewPlaylistDesc] = useState<string>("");
-
-  // TIDAL Device Auth State
-  const [tidalAuthData, setTidalAuthData] = useState<{
-    device_code: string;
-    user_code: string;
-    verification_uri: string;
-    verification_uri_complete?: string;
-    expires_in: number;
-    interval: number;
-  } | null>(null);
-  const [tidalConnected, setTidalConnected] = useState<boolean>(false);
-  const [isTidalBusy, setIsTidalBusy] = useState<boolean>(false);
-  const [, setTidalToken] = useState<string>("");
-
-  // Aggregator inputs
-  const [playlistUrlInput, setPlaylistUrlInput] = useState<string>("");
-  const [isImporting, setIsImporting] = useState<boolean>(false);
-
-  // Vault tester
-  const [vaultPassword, setVaultPassword] = useState<string>("WowMasterPass2026!");
-  const [vaultPlaintext, setVaultPlaintext] = useState<string>("tidal_session_token_xyz_encrypted_secret");
-  const [encryptedResult, setEncryptedResult] = useState<any>(null);
-  const [decryptedResult, setDecryptedResult] = useState<string>("");
-  const [isVaultBusy, setIsVaultBusy] = useState<boolean>(false);
-
-  const currentTrack = tracks[currentTrackIndex] || tracks[0] || {
-    id: "empty",
-    title: "Belum Ada Lagu",
-    artist: "Pilih atau Tambah Lagu",
-    duration_secs: 0,
-    original_source: "Local",
-    preferred_provider: "Local",
-    cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
-    audio_quality: "None",
-  };
+  // Lyrics
+  const [lyrics, setLyrics] = useState<TimedLyricLine[]>(DEFAULT_LYRICS);
+  const [lyricsSource, setLyricsSource] = useState<string>("LRCLIB (Synced 60 FPS)");
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load playlists from SQLite on mount
+  // Toast System
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info", title?: string) => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    setToasts((prev) => [...prev, { id, message, type, title }]);
+  };
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Google Account & Cloud Vault State
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    id: "user-google-109283",
+    name: "Abdul Muqsith",
+    email: "muqsithpersonal@gmail.com",
+    avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+    is_signed_in: true,
+    cloud_synced: true,
+    active_devices: 2,
+  });
+
+  // TIDAL Connection State in Account
+  const [isConnectingTidal, setIsConnectingTidal] = useState(false);
+  const [tidalAuthCode, setTidalAuthCode] = useState<string | null>(null);
+  const [tidalVerificationUri, setTidalVerificationUri] = useState<string | null>(null);
+  const [customTidalClientId, setCustomTidalClientId] = useState("");
+  const [customTidalToken, setCustomTidalToken] = useState("");
+  const [isTidalConnected, setIsTidalConnected] = useState(false);
+
+  // Playlist Create Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+
+  const currentTrack = tracks[currentTrackIndex] || SAMPLE_SUPER_PLAYLIST[0];
+
+  // 1. Initial Load: Playlists from SQLite
   const loadPlaylists = async () => {
     try {
       const list = await invoke<Playlist[]>("db_get_playlists");
@@ -201,13 +225,13 @@ export default function App() {
         return;
       }
     } catch (err) {
-      console.warn("Using sample playlist in browser fallback mode:", err);
+      console.warn("Using sample playlist in browser preview mode:", err);
     }
     setPlaylists([
       {
         id: "default-super-playlist",
         title: "Universal Master Hub",
-        description: "A multi-source universal playlist with tracks from Spotify, YouTube Music, TIDAL, and Local FLAC",
+        description: "Unified cross-platform playlist from Spotify, TIDAL, YouTube Music & Local Hi-Res",
         cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
         track_count: SAMPLE_SUPER_PLAYLIST.length,
         created_at: Date.now(),
@@ -221,13 +245,13 @@ export default function App() {
   const loadPlaylistTracks = async (playlistId: string) => {
     try {
       const trks = await invoke<UnifiedTrackItem[]>("db_get_playlist_tracks", { playlistId });
-      if (trks) {
+      if (trks && trks.length > 0) {
         setTracks(trks);
         setCurrentTrackIndex(0);
         setCurrentTimeMs(0);
       }
     } catch (e) {
-      console.warn("Failed to load tracks from db:", e);
+      console.warn("Using cached tracks:", e);
     }
   };
 
@@ -235,7 +259,7 @@ export default function App() {
     loadPlaylists();
   }, []);
 
-  // Fetch audio devices from Tauri backend on mount
+  // 2. Audio Devices enumeration
   useEffect(() => {
     async function loadDevices() {
       try {
@@ -246,7 +270,6 @@ export default function App() {
           setSelectedDevice(def.name);
         }
       } catch (err) {
-        console.warn("Using fallback audio devices in browser preview:", err);
         setAudioDevices([
           { name: "Default System Output (ALSA / PipeWire)", is_default: true, max_sample_rate: 192000, supported_channels: 2 },
           { name: "USB DAC Bit-Perfect (WASAPI / ALSA Direct)", is_default: false, max_sample_rate: 384000, supported_channels: 2 },
@@ -257,7 +280,7 @@ export default function App() {
     loadDevices();
   }, []);
 
-  // Fetch real-time synced lyrics from Tauri backend (LRCLIB / TIDAL)
+  // 3. Lyrics Fetching
   useEffect(() => {
     async function loadLyrics() {
       if (!currentTrack.title || currentTrack.id === "empty") return;
@@ -278,7 +301,7 @@ export default function App() {
           return;
         }
       } catch (err) {
-        console.warn("Using default synced lyrics fallback:", err);
+        // Fallback to default
       }
       setLyrics(DEFAULT_LYRICS);
       setLyricsSource("LRCLIB (Synced 60 FPS)");
@@ -286,7 +309,7 @@ export default function App() {
     loadLyrics();
   }, [currentTrack]);
 
-  // Playback timer simulation
+  // 4. Real-time timer synced with playback
   useEffect(() => {
     let interval: any = null;
     if (isPlaying) {
@@ -303,7 +326,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isPlaying, currentTrack]);
 
-  // Auto-scroll active lyric
+  // Active lyric index calculation
   const activeLyricIndex = lyrics.findIndex((line, i) => {
     const nextLine = lyrics[i + 1];
     if (nextLine) {
@@ -312,6 +335,7 @@ export default function App() {
     return currentTimeMs >= line.timestamp_ms;
   });
 
+  // Auto-scroll active lyric
   useEffect(() => {
     if (lyricsContainerRef.current && activeLyricIndex !== -1) {
       const activeEl = lyricsContainerRef.current.children[activeLyricIndex] as HTMLElement;
@@ -321,10 +345,9 @@ export default function App() {
     }
   }, [activeLyricIndex]);
 
-  // Broadcast lyrics & playback state to Floating Overlay
+  // Broadcast to Floating Window Overlay
   useEffect(() => {
     const channel = new BroadcastChannel("wowmusic_lyrics_channel");
-
     channel.onmessage = (event) => {
       if (event.data?.type === "TOGGLE_PLAY") {
         togglePlay();
@@ -352,15 +375,7 @@ export default function App() {
     };
   }, [currentTrack, activeLyricIndex, currentTimeMs, isPlaying, lyrics]);
 
-  const handleToggleFloatingLyrics = async () => {
-    try {
-      await invoke("toggle_floating_lyrics");
-    } catch (err) {
-      console.warn("Toggle floating lyrics fallback:", err);
-      window.open("?window=overlay", "lyrics-overlay", "width=520,height=140");
-    }
-  };
-
+  // Playback Controls connected to Rust Real Audio Engine
   const togglePlay = async () => {
     const nextState = !isPlaying;
     setIsPlaying(nextState);
@@ -371,24 +386,43 @@ export default function App() {
           durationMs: currentTrack.duration_secs * 1000,
           qualityLabel: currentTrack.audio_quality,
         });
+        showToast(`Memutar: ${currentTrack.title}`, "info");
       } else {
         await invoke("pause_playback");
       }
     } catch (e) {
-      // Browser preview fallback
+      console.warn("Audio invoke error:", e);
     }
   };
 
   const handleNext = () => {
     if (tracks.length === 0) return;
-    setCurrentTrackIndex((prev) => (prev + 1) % tracks.length);
+    const nextIdx = (currentTrackIndex + 1) % tracks.length;
+    setCurrentTrackIndex(nextIdx);
     setCurrentTimeMs(0);
+    if (isPlaying) {
+      const trk = tracks[nextIdx];
+      invoke("play_track", {
+        trackId: trk.id,
+        durationMs: trk.duration_secs * 1000,
+        qualityLabel: trk.audio_quality,
+      }).catch(() => {});
+    }
   };
 
   const handlePrev = () => {
     if (tracks.length === 0) return;
-    setCurrentTrackIndex((prev) => (prev - 1 + tracks.length) % tracks.length);
+    const prevIdx = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+    setCurrentTrackIndex(prevIdx);
     setCurrentTimeMs(0);
+    if (isPlaying) {
+      const trk = tracks[prevIdx];
+      invoke("play_track", {
+        trackId: trk.id,
+        durationMs: trk.duration_secs * 1000,
+        qualityLabel: trk.audio_quality,
+      }).catch(() => {});
+    }
   };
 
   const handleSeek = async (newMs: number) => {
@@ -398,28 +432,49 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleVolumeChange = async (newVol: number) => {
+    setVolume(newVol);
+    setIsMuted(newVol === 0);
+    try {
+      await invoke("set_volume", { volume: newVol });
+    } catch (e) {}
+  };
+
+  const handleToggleFloatingLyrics = async () => {
+    try {
+      await invoke("toggle_floating_lyrics");
+      showToast("Widget lirik melayang diaktifkan", "success");
+    } catch (err) {
+      window.open("?window=overlay", "lyrics-overlay", "width=520,height=140");
+    }
+  };
+
+  // Playlist Management
   const handleCreatePlaylist = async () => {
-    if (!newPlaylistTitle.trim()) return;
+    if (!newTitle.trim()) {
+      showToast("Nama playlist tidak boleh kosong", "warning");
+      return;
+    }
     try {
       const newPl = await invoke<Playlist>("db_create_playlist", {
-        title: newPlaylistTitle.trim(),
-        description: newPlaylistDesc.trim() || null,
+        title: newTitle.trim(),
+        description: newDesc.trim() || null,
         coverUrl: null,
       });
       setPlaylists((prev) => [newPl, ...prev]);
       setActivePlaylistId(newPl.id);
       setTracks([]);
-      setIsCreatePlaylistOpen(false);
-      setNewPlaylistTitle("");
-      setNewPlaylistDesc("");
+      setIsCreateModalOpen(false);
+      setNewTitle("");
+      setNewDesc("");
+      showToast(`Playlist "${newPl.title}" berhasil dibuat`, "success");
     } catch (e) {
-      alert("Gagal membuat playlist: " + e);
+      showToast(`Gagal membuat playlist: ${e}`, "error");
     }
   };
 
   const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Hapus playlist ini dari database lokal?")) return;
     try {
       await invoke("db_delete_playlist", { playlistId: id });
       const remaining = playlists.filter((p) => p.id !== id);
@@ -428,413 +483,513 @@ export default function App() {
         setActivePlaylistId(remaining[0].id);
         loadPlaylistTracks(remaining[0].id);
       }
+      showToast("Playlist berhasil dihapus", "info");
     } catch (err) {
-      alert("Gagal menghapus playlist: " + err);
+      showToast(`Gagal menghapus playlist: ${err}`, "error");
     }
   };
 
-  const handleAddTrack = async (newTrack: UnifiedTrackItem) => {
-    try {
-      await invoke("db_add_track_to_playlist", {
-        playlistId: activePlaylistId,
-        track: {
-          id: newTrack.id,
-          title: newTrack.title,
-          artist: newTrack.artist,
-          album: newTrack.album || null,
-          duration_secs: newTrack.duration_secs,
-          isrc: newTrack.isrc || null,
-          original_source: newTrack.original_source,
-          preferred_provider: newTrack.preferred_provider,
-          cover_url: newTrack.cover_url || null,
-          audio_quality: newTrack.audio_quality || null,
-          local_path: null,
-        },
-      });
-      await loadPlaylistTracks(activePlaylistId);
-      const list = await invoke<Playlist[]>("db_get_playlists");
-      if (list) setPlaylists(list);
-    } catch (e) {
-      console.warn("Saved to in-memory state:", e);
-      setTracks((prev) => [...prev, newTrack]);
-    }
-  };
-
-  const handleUpdateProvider = async (trackId: string, newProvider: "Spotify" | "YouTubeMusic" | "Tidal" | "Local") => {
-    setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, preferred_provider: newProvider } : t))
-    );
+  const handleUpdateProvider = async (
+    trackId: string,
+    newProvider: "Spotify" | "YouTubeMusic" | "Tidal" | "Local"
+  ) => {
     try {
       await invoke("db_update_preferred_provider", {
-        trackId,
-        preferredProvider: newProvider,
-      });
-    } catch (e) {
-      console.warn("Provider update fallback:", e);
-    }
-  };
-
-  const handleRemoveTrack = async (trackId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await invoke("db_remove_track_from_playlist", {
         playlistId: activePlaylistId,
         trackId,
+        provider: newProvider,
       });
-      await loadPlaylistTracks(activePlaylistId);
-      const list = await invoke<Playlist[]>("db_get_playlists");
-      if (list) setPlaylists(list);
+      setTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, preferred_provider: newProvider } : t))
+      );
+      showToast(`Sumber pemutaran diubah ke ${newProvider}`, "success");
     } catch (err) {
-      console.warn("Remove track fallback:", err);
-      setTracks((prev) => prev.filter((t) => t.id !== trackId));
+      setTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, preferred_provider: newProvider } : t))
+      );
+      showToast(`Sumber pemutaran diperbarui ke ${newProvider}`, "info");
     }
   };
 
-  const handleImportPlaylist = async () => {
-    if (!playlistUrlInput.trim()) return;
-    setIsImporting(true);
-    setTimeout(async () => {
-      const src = playlistUrlInput.includes("youtube")
-        ? "YouTubeMusic"
-        : playlistUrlInput.includes("apple")
-        ? "AppleMusic"
-        : playlistUrlInput.includes("tidal")
-        ? "Tidal"
-        : "Spotify";
-
-      const newImported: UnifiedTrackItem = {
-        id: `agg-${Date.now()}`,
-        title: "Levitating",
-        artist: "Dua Lipa",
-        album: "Future Nostalgia",
-        duration_secs: 203,
-        isrc: "GBAYE2000632",
-        original_source: src,
-        preferred_provider: src === "AppleMusic" ? "Spotify" : (src as any),
-        cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
-        audio_quality: "High Fidelity Stream",
-      };
-      await handleAddTrack(newImported);
-      setPlaylistUrlInput("");
-      setIsImporting(false);
-    }, 600);
-  };
-
-  const handleTestVaultEncrypt = async () => {
-    setIsVaultBusy(true);
-    try {
-      const res = await invoke("vault_encrypt", {
-        password: vaultPassword,
-        plaintext: vaultPlaintext,
-      });
-      setEncryptedResult(res);
-      setDecryptedResult("");
-    } catch (e) {
-      alert("Encryption error: " + e);
-    } finally {
-      setIsVaultBusy(false);
-    }
-  };
-
-  const handleTestVaultDecrypt = async () => {
-    if (!encryptedResult) return;
-    setIsVaultBusy(true);
-    try {
-      const res = await invoke<string>("vault_decrypt", {
-        password: vaultPassword,
-        item: encryptedResult,
-      });
-      setDecryptedResult(res);
-    } catch (e) {
-      alert("Decryption error: " + e);
-    } finally {
-      setIsVaultBusy(false);
-    }
-  };
-
+  // TIDAL Connection Handler
   const handleStartTidalAuth = async () => {
-    setIsTidalBusy(true);
+    setIsConnectingTidal(true);
+    setTidalAuthCode(null);
     try {
-      const authResp = await invoke<{
+      const res = await invoke<{
         device_code: string;
         user_code: string;
         verification_uri: string;
-        verification_uri_complete?: string;
         expires_in: number;
         interval: number;
       }>("tidal_start_device_auth");
-      setTidalAuthData(authResp);
-      pollTidalToken(authResp.device_code, authResp.interval || 5);
-    } catch (err) {
-      alert("Gagal menghubungi TIDAL Auth: " + err);
+
+      setTidalAuthCode(res.user_code);
+      setTidalVerificationUri(res.verification_uri);
+      showToast("Kode pairing TIDAL berhasil diperoleh! Buka link verifikasi.", "success", "TIDAL Auth");
+    } catch (err: any) {
+      const errStr = String(err);
+      if (errStr.includes("403") || errStr.includes("1005")) {
+        showToast(
+          "Client ID bawaan TIDAL dibatasi oleh auth server TIDAL. Anda dapat memasukkan Client ID / Token pribadi di bawah.",
+          "warning",
+          "TIDAL Auth Terbatas"
+        );
+      } else {
+        showToast(`Koneksi TIDAL: ${errStr}`, "error", "Gagal Menghubungi TIDAL");
+      }
     } finally {
-      setIsTidalBusy(false);
+      setIsConnectingTidal(false);
     }
   };
 
-  const pollTidalToken = (deviceCode: string, intervalSecs: number) => {
-    const timer = setInterval(async () => {
-      try {
-        const tokenResp = await invoke<{
-          access_token: string;
-          refresh_token?: string;
-          user_id?: number;
-        }>("tidal_poll_device_token", { deviceCode });
-
-        if (tokenResp && tokenResp.access_token) {
-          clearInterval(timer);
-          setTidalToken(tokenResp.access_token);
-          setTidalConnected(true);
-          setTidalAuthData(null);
-        }
-      } catch (e) {
-        // Pending approval from browser, continue polling
-      }
-    }, Math.max(intervalSecs, 3) * 1000);
-  };
-
-  const handleDisconnectTidal = () => {
-    setTidalConnected(false);
-    setTidalToken("");
-    setTidalAuthData(null);
-  };
-
-  const formatSeconds = (totalSec: number) => {
-    const mins = Math.floor(totalSec / 60);
-    const secs = Math.floor(totalSec % 60);
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  const formatTime = (ms: number) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      {/* Sidebar Navigation */}
-      <aside className="flex flex-col w-64 border-r border-zinc-800/80 bg-zinc-900/50 backdrop-blur-xl p-4 gap-6 select-none shrink-0">
-        {/* Brand Header */}
-        <div className="flex items-center gap-3 px-2">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20">
-            <Radio className="w-5 h-5 text-zinc-950 font-bold" />
+    <div className="relative min-h-screen bg-black text-neutral-100 font-sans select-none overflow-x-hidden pb-32">
+      {/* Toast Notification Layer */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Atmospheric Ambient Glow Header (Apple Music Replay style) */}
+      <div className="absolute top-0 left-0 right-0 h-96 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(220,50,20,0.28),rgba(255,100,50,0.08),rgba(0,0,0,0))] pointer-events-none -z-0" />
+
+      {/* Top Floating Glass Capsule Navigation Bar */}
+      <header className="sticky top-0 z-40 flex items-center justify-between px-6 pt-5 pb-3">
+        {/* Brand & Live Audio Tag */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-950/40">
+            <Disc3 className="w-4 h-4 text-white animate-spin [animation-duration:8s]" />
           </div>
           <div>
-            <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-zinc-100 to-zinc-400 bg-clip-text text-transparent">
+            <span className="text-sm font-semibold tracking-tight text-white block leading-none">
               WowMusic
-            </h1>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-[10px] uppercase font-semibold tracking-wider text-emerald-400/90">
-                Hi-Res Audio
-              </span>
-            </div>
+            </span>
+            <span className="text-[10px] text-neutral-400 font-medium tracking-wide uppercase">
+              Universal Hub
+            </span>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex flex-col gap-1.5 text-sm font-medium">
+        {/* Center Pill Navigation Bar (Apple Music aesthetic) */}
+        <nav className="flex items-center gap-1 p-1 rounded-full bg-neutral-900/70 backdrop-blur-2xl border border-white/10 shadow-2xl">
           <button
-            onClick={() => setActiveTab("now-playing")}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              activeTab === "now-playing"
-                ? "bg-cyan-500/15 text-cyan-400 shadow-sm border border-cyan-500/30"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            onClick={() => setActiveTab("home")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+              activeTab === "home"
+                ? "bg-white/15 text-white shadow-sm"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
-            <Music className="w-4 h-4" />
-            <span>Now Playing & Lyrics</span>
+            Replay
           </button>
-
           <button
-            onClick={() => setActiveTab("aggregator")}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              activeTab === "aggregator"
-                ? "bg-cyan-500/15 text-cyan-400 shadow-sm border border-cyan-500/30"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            onClick={() => setActiveTab("library")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+              activeTab === "library"
+                ? "bg-white/15 text-white shadow-sm"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>Playlist Aggregator</span>
-            <span className="ml-auto text-[10px] bg-cyan-500/20 text-cyan-300 font-semibold px-2 py-0.5 rounded-full border border-cyan-500/30">
-              {tracks.length}
-            </span>
+            Library
           </button>
-
           <button
-            onClick={() => setActiveTab("devices")}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              activeTab === "devices"
-                ? "bg-cyan-500/15 text-cyan-400 shadow-sm border border-cyan-500/30"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            onClick={() => setActiveTab("lyrics")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+              activeTab === "lyrics"
+                ? "bg-white/15 text-white shadow-sm"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
-            <Speaker className="w-4 h-4" />
-            <span>Audio & DAC Engine</span>
+            Lyrics
           </button>
-
           <button
-            onClick={() => setActiveTab("vault")}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              activeTab === "vault"
-                ? "bg-cyan-500/15 text-cyan-400 shadow-sm border border-cyan-500/30"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            onClick={() => setActiveTab("account")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+              activeTab === "account"
+                ? "bg-white/15 text-white shadow-sm"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
-            <span>WowCloud Vault</span>
+            <User className="w-3.5 h-3.5" />
+            Account
           </button>
         </nav>
 
-        {/* SQLite Universal Playlists Hub */}
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden pt-3 border-t border-zinc-800/80">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-cyan-400" />
-              Playlists (SQLite)
-            </span>
-            <button
-              onClick={() => setIsCreatePlaylistOpen(true)}
-              title="Buat Playlist Baru"
-              className="p-1 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 rounded-lg transition-all"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-1 pr-1 text-xs select-none">
-            {playlists.map((pl) => (
-              <div
-                key={pl.id}
-                onClick={() => {
-                  setActivePlaylistId(pl.id);
-                  loadPlaylistTracks(pl.id);
-                  setActiveTab("aggregator");
-                }}
-                className={`group flex items-center justify-between px-2.5 py-2 rounded-xl cursor-pointer transition-all ${
-                  activePlaylistId === pl.id
-                    ? "bg-cyan-500/15 text-cyan-300 font-medium border border-cyan-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <ListMusic className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{pl.title}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] bg-zinc-800/80 text-zinc-400 font-mono px-1.5 py-0.5 rounded">
-                    {pl.track_count}
-                  </span>
-                  {pl.id !== "default-super-playlist" && (
-                    <button
-                      onClick={(e) => handleDeletePlaylist(pl.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 rounded transition-opacity"
-                      title="Hapus Playlist"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Right Action Icons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleFloatingLyrics}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-neutral-300 transition-colors cursor-pointer"
+            title="Buka Overlay Lirik Melayang Desktop"
+          >
+            <PictureInPicture2 className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Widget Overlay</span>
+          </button>
         </div>
+      </header>
 
-        {/* Server & VPS Status Badge */}
-        <div className="mt-auto p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/60 text-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-zinc-400 font-medium flex items-center gap-1.5">
-              <Cloud className="w-3.5 h-3.5 text-cyan-400" />
-              vps-advin
-            </span>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-medium">
-              160.187.211.115
-            </span>
-          </div>
-          <p className="text-[11px] text-zinc-500 leading-relaxed">
-            WowServer cloud session active for encrypted sync & remote handoff.
-          </p>
-        </div>
-      </aside>
-
-      {/* Main Content View */}
-      <main className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-zinc-900/40 to-zinc-950 overflow-hidden">
-        {/* VIEW 1: Now Playing & Live Lyrics */}
-        {activeTab === "now-playing" && (
-          <div className="flex-1 flex flex-col md:flex-row p-6 gap-8 overflow-hidden">
-            {/* Left: Album Art & Details */}
-            <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto text-center">
-              <div className="relative group w-72 h-72 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-2xl shadow-cyan-500/10 border border-zinc-800">
-                <img
-                  src={currentTrack.cover_url}
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent pointer-events-none" />
-                <span className="absolute top-3 left-3 text-[11px] font-semibold bg-zinc-900/90 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/30 backdrop-blur-md">
-                  {currentTrack.audio_quality}
-                </span>
+      {/* Main Content Area */}
+      <main className="max-w-6xl mx-auto px-6 pt-4">
+        {/* ========================================================================= */}
+        {/* TAB 1: HOME (Apple Music Replay Layout)                                   */}
+        {/* ========================================================================= */}
+        {activeTab === "home" && (
+          <div className="space-y-10 animate-in fade-in duration-300">
+            {/* Hero Replay Title */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-rose-400 uppercase tracking-widest">
+                <Sparkles className="w-3.5 h-3.5" /> Universal Music Playback
               </div>
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
+                Replay 2026
+              </h1>
+              <p className="text-neutral-400 text-sm max-w-xl">
+                Nikmati lagu favorit dari Spotify, TIDAL, YouTube Music, dan file lokal dalam kualitas audio murni tanpa kompresi.
+              </p>
+            </div>
 
-              <div className="mt-6 w-full">
-                <h2 className="text-2xl font-bold tracking-tight text-zinc-100 truncate">
-                  {currentTrack.title}
+            {/* Top Artists / Highlights Carousel (Sesuai Referensi Gambar) */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                  Artis & Playlist Unggulan <ChevronRight className="w-4 h-4 text-neutral-500" />
                 </h2>
-                <p className="text-base text-zinc-400 mt-1 font-medium truncate">
-                  {currentTrack.artist}
-                </p>
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-xs text-zinc-400 bg-zinc-800/60 px-2.5 py-1 rounded-full border border-zinc-700/50">
-                    Origin: {currentTrack.original_source}
-                  </span>
-                  <span className="text-xs text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/30 font-medium">
-                    Playing via: {currentTrack.preferred_provider}
-                  </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {/* Card 1 */}
+                <div
+                  onClick={() => {
+                    setCurrentTrackIndex(0);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className="group relative h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80"
+                    alt="Queen"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                  <div className="absolute top-3 left-4 text-4xl font-extrabold text-white/90">
+                    1
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="text-base font-bold text-white leading-snug">Queen</div>
+                    <div className="text-xs text-neutral-300">1,240 menit didengarkan</div>
+                  </div>
+                </div>
+
+                {/* Card 2 */}
+                <div
+                  onClick={() => {
+                    setCurrentTrackIndex(2);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className="group relative h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"
+                    alt="Taylor Swift"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                  <div className="absolute top-3 left-4 text-4xl font-extrabold text-white/90">
+                    2
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="text-base font-bold text-white leading-snug">Taylor Swift</div>
+                    <div className="text-xs text-neutral-300">890 menit didengarkan</div>
+                  </div>
+                </div>
+
+                {/* Card 3 */}
+                <div
+                  onClick={() => {
+                    setCurrentTrackIndex(4);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className="group relative h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80"
+                    alt="Olivia Rodrigo"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                  <div className="absolute top-3 left-4 text-4xl font-extrabold text-white/90">
+                    3
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="text-base font-bold text-white leading-snug">Olivia Rodrigo</div>
+                    <div className="text-xs text-neutral-300">540 menit didengarkan</div>
+                  </div>
+                </div>
+
+                {/* Card 4 */}
+                <div
+                  onClick={() => {
+                    setCurrentTrackIndex(1);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className="group relative h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80"
+                    alt="The Weeknd"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                  <div className="absolute top-3 left-4 text-4xl font-extrabold text-white/90">
+                    4
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="text-base font-bold text-white leading-snug">The Weeknd</div>
+                    <div className="text-xs text-neutral-300">420 menit didengarkan</div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Live Karaoke Lyrics */}
-            <div className="flex-1 flex flex-col bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-6 backdrop-blur-md overflow-hidden">
-              <div className="flex items-center justify-between pb-4 border-b border-zinc-800/60 shrink-0">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-                  <h3 className="font-semibold text-sm uppercase tracking-wider text-zinc-300">
-                    Immersive Live Lyrics
-                  </h3>
-                </div>
+            {/* Top Songs List (Sesuai Referensi Gambar Apple Music) */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                  Lagu Teratas <ChevronRight className="w-4 h-4 text-neutral-500" />
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {tracks.map((track, idx) => {
+                  const isCurrent = currentTrack.id === track.id;
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => {
+                        setCurrentTrackIndex(idx);
+                        if (!isPlaying) togglePlay();
+                      }}
+                      className={`group flex items-center justify-between p-2.5 rounded-xl transition-colors cursor-pointer ${
+                        isCurrent
+                          ? "bg-white/10 border border-white/10"
+                          : "hover:bg-white/5 border border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-5 text-center text-sm font-bold text-neutral-400 group-hover:text-white">
+                          {idx + 1}
+                        </span>
+                        <img
+                          src={track.cover_url}
+                          alt={track.title}
+                          className="w-11 h-11 rounded-lg object-cover shadow"
+                        />
+                        <div className="min-w-0">
+                          <div
+                            className={`text-sm font-medium truncate ${
+                              isCurrent ? "text-rose-400 font-semibold" : "text-white"
+                            }`}
+                          >
+                            {track.title}
+                          </div>
+                          <div className="text-xs text-neutral-400 truncate">{track.artist}</div>
+                        </div>
+                      </div>
 
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={handleToggleFloatingLyrics}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-500/30 transition-all shadow-sm"
-                    title="Buka Widget Lirik Mengambang di Desktop"
-                  >
-                    <PictureInPicture2 className="w-3.5 h-3.5" />
-                    <span>Floating Widget</span>
-                  </button>
-                  <span className="text-xs font-mono text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded">
-                    {lyricsSource}
-                  </span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-white/5 text-neutral-300 border border-white/10">
+                          {track.preferred_provider}
+                        </span>
+                        <span className="text-xs text-neutral-400 font-mono">
+                          {formatTime(track.duration_secs * 1000)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: UNIVERSAL LIBRARY & SQLITE PLAYLISTS                               */}
+        {/* ========================================================================= */}
+        {activeTab === "library" && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Header Library */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-white">
+                  Koleksi Playlist Universal
+                </h1>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Tersimpan di SQLite lokal independen — Bebas memilih sumber pemutaran untuk tiap lagu.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-neutral-200 transition-colors shadow-lg cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Buat Playlist
+              </button>
+            </div>
+
+            {/* Playlist Badges Selector */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {playlists.map((pl) => (
+                <div
+                  key={pl.id}
+                  onClick={() => {
+                    setActivePlaylistId(pl.id);
+                    loadPlaylistTracks(pl.id);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium cursor-pointer transition-all border shrink-0 ${
+                    activePlaylistId === pl.id
+                      ? "bg-white/15 text-white border-white/20 shadow-sm"
+                      : "bg-neutral-900/60 text-neutral-400 border-white/5 hover:text-white hover:border-white/15"
+                  }`}
+                >
+                  <ListMusic className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{pl.title}</span>
+                  {playlists.length > 1 && (
+                    <Trash2
+                      onClick={(e) => handleDeletePlaylist(pl.id, e)}
+                      className="w-3.5 h-3.5 text-neutral-500 hover:text-rose-400 ml-1 transition-colors"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Tracks in Current Playlist */}
+            <div className="rounded-2xl bg-neutral-900/40 border border-white/10 p-5 backdrop-blur-xl">
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <div className="text-sm font-semibold text-white">
+                  Daftar Lagu ({tracks.length})
+                </div>
+                <div className="text-xs text-neutral-400">
+                  Klik provider untuk mengubah playback source
                 </div>
               </div>
 
-              {/* Scrolling Lyrics Container */}
+              <div className="divide-y divide-white/5 mt-2">
+                {tracks.map((trk, i) => (
+                  <div
+                    key={trk.id}
+                    className="flex items-center justify-between py-3 px-2 hover:bg-white/5 rounded-xl transition-colors group"
+                  >
+                    <div
+                      onClick={() => {
+                        setCurrentTrackIndex(i);
+                        if (!isPlaying) togglePlay();
+                      }}
+                      className="flex items-center gap-3.5 min-w-0 cursor-pointer flex-1"
+                    >
+                      <span className="w-5 text-center text-xs font-bold text-neutral-500">
+                        {i + 1}
+                      </span>
+                      <img
+                        src={trk.cover_url}
+                        alt={trk.title}
+                        className="w-10 h-10 rounded-lg object-cover shadow"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-white truncate group-hover:text-rose-400 transition-colors">
+                          {trk.title}
+                        </div>
+                        <div className="text-xs text-neutral-400 truncate">{trk.artist}</div>
+                      </div>
+                    </div>
+
+                    {/* Provider Pill Selector */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-1 bg-black/40 p-1 rounded-full border border-white/10">
+                        {(["Spotify", "Tidal", "YouTubeMusic", "Local"] as const).map((prov) => (
+                          <button
+                            key={prov}
+                            onClick={() => handleUpdateProvider(trk.id, prov)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors cursor-pointer ${
+                              trk.preferred_provider === prov
+                                ? "bg-white text-black font-semibold shadow"
+                                : "text-neutral-400 hover:text-white"
+                            }`}
+                          >
+                            {prov === "YouTubeMusic" ? "YT" : prov}
+                          </button>
+                        ))}
+                      </div>
+
+                      <span className="text-xs text-neutral-400 font-mono w-10 text-right">
+                        {formatTime(trk.duration_secs * 1000)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: LYRICS (Apple Music Fullscreen Time-Synced Karaoke Layout)         */}
+        {/* ========================================================================= */}
+        {activeTab === "lyrics" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[70vh] animate-in fade-in duration-300">
+            {/* Left Column: Big Cover Artwork */}
+            <div className="lg:col-span-5 flex flex-col items-center text-center space-y-5">
+              <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 group">
+                <img
+                  src={currentTrack.cover_url}
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold text-white tracking-tight">{currentTrack.title}</h2>
+                <p className="text-sm text-neutral-400">{currentTrack.artist}</p>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-neutral-300 mt-2">
+                  <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{currentTrack.audio_quality}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Time-Synced Flowing Lyrics */}
+            <div className="lg:col-span-7 h-[65vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                <div className="text-xs font-semibold tracking-wider text-rose-400 uppercase flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  {lyricsSource}
+                </div>
+                <div className="text-xs text-neutral-400">
+                  Klik baris lirik untuk melompat langsung (Click-to-Seek)
+                </div>
+              </div>
+
               <div
                 ref={lyricsContainerRef}
-                className="flex-1 overflow-y-auto space-y-4 py-8 px-2 scroll-smooth text-left"
+                className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth"
               >
                 {lyrics.map((line, idx) => {
                   const isActive = idx === activeLyricIndex;
                   return (
                     <div
                       key={idx}
-                      onClick={() => handleSeek(line.timestamp_ms as number)}
-                      className={`group relative cursor-pointer transition-all duration-300 text-lg md:text-xl font-medium tracking-tight rounded-xl px-4 py-2.5 flex items-center justify-between ${
+                      onClick={() => handleSeek(line.timestamp_ms)}
+                      className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
                         isActive
-                          ? "text-cyan-300 font-bold text-2xl scale-[1.02] bg-cyan-500/15 border-l-4 border-cyan-400 shadow-xl shadow-cyan-500/15"
-                          : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40"
+                          ? "scale-105 text-white font-bold text-2xl sm:text-3xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
+                          : "text-neutral-500 hover:text-neutral-300 text-lg sm:text-xl font-medium filter blur-[0.2px] hover:blur-none"
                       }`}
-                      title="Klik lirik untuk langsung melompat ke detik ini"
                     >
-                      <span>{line.text}</span>
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-mono text-zinc-400 bg-zinc-800/90 px-2 py-0.5 rounded ml-3 shrink-0">
-                        {formatSeconds(Math.floor(line.timestamp_ms / 1000))}
+                      <div className="leading-snug">{line.text}</div>
+                      <span className="opacity-0 group-hover:opacity-100 text-xs font-mono text-neutral-400 bg-white/10 px-2 py-1 rounded-md transition-opacity">
+                        {formatTime(line.timestamp_ms)}
                       </span>
                     </div>
                   );
@@ -844,432 +999,247 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: Universal Playlist Aggregator */}
-        {activeTab === "aggregator" && (
-          <div className="flex-1 flex flex-col p-8 overflow-y-auto max-w-6xl w-full mx-auto space-y-6">
-            {/* Active Playlist Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-                    {playlists.find((p) => p.id === activePlaylistId)?.title || "Universal Super Playlist"}
-                  </h2>
-                  <span className="text-[11px] bg-cyan-500/20 text-cyan-300 font-semibold px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-cyan-400" />
-                    SQLite Persisted
-                  </span>
-                </div>
-                <p className="text-sm text-zinc-400 mt-1">
-                  {playlists.find((p) => p.id === activePlaylistId)?.description ||
-                    "Satukan lagu dari Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal dalam satu antrean utuh dengan kebebasan memilih playback provider."}
-                </p>
-              </div>
-
-              <button
-                onClick={() => setIsCreatePlaylistOpen(true)}
-                className="px-4 py-2.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-all flex items-center gap-2 self-start md:self-auto shadow-sm"
-              >
-                <FolderPlus className="w-4 h-4 text-cyan-400" />
-                <span>Buat Playlist Baru</span>
-              </button>
-            </div>
-
-            {/* Importer Box */}
-            <div className="flex gap-3 p-2 bg-zinc-900/80 border border-zinc-800 rounded-2xl shadow-xl">
-              <div className="relative flex-1 flex items-center">
-                <Search className="w-5 h-5 text-zinc-400 absolute left-4" />
-                <input
-                  type="text"
-                  placeholder="Tempel link lagu/playlist Spotify / YouTube Music / Apple Music..."
-                  value={playlistUrlInput}
-                  onChange={(e) => setPlaylistUrlInput(e.target.value)}
-                  className="w-full bg-transparent pl-12 pr-4 py-3 text-sm focus:outline-none text-zinc-100 placeholder:text-zinc-500"
-                />
-              </div>
-              <button
-                onClick={handleImportPlaylist}
-                disabled={isImporting}
-                className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50 shrink-0"
-              >
-                {isImporting ? "Menyimpan ke SQLite..." : "Tambah ke Playlist"}
-              </button>
-            </div>
-
-            {/* Aggregated Tracks Table */}
-            <div className="border border-zinc-800/80 rounded-2xl overflow-hidden bg-zinc-900/40">
-              {tracks.length === 0 ? (
-                <div className="p-12 text-center text-zinc-500">
-                  <ListMusic className="w-12 h-12 mx-auto mb-3 text-zinc-600" />
-                  <p className="text-sm font-medium text-zinc-400">Playlist ini masih kosong</p>
-                  <p className="text-xs text-zinc-600 mt-1">
-                    Tempel tautan Spotify, YouTube Music, atau Apple Music di atas untuk menambahkan lagu ke database SQLite.
-                  </p>
-                </div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-900/80 text-zinc-400 uppercase text-xs font-semibold border-b border-zinc-800">
-                    <tr>
-                      <th className="px-6 py-4"># Track</th>
-                      <th className="px-6 py-4">Artist & Album</th>
-                      <th className="px-6 py-4">Original Source</th>
-                      <th className="px-6 py-4">Playback Provider (User Choice)</th>
-                      <th className="px-6 py-4">Quality Info</th>
-                      <th className="px-6 py-4 text-right">Durasi</th>
-                      <th className="px-4 py-4 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {tracks.map((t, idx) => (
-                      <tr
-                        key={t.id}
-                        onClick={() => {
-                          setCurrentTrackIndex(idx);
-                          setCurrentTimeMs(0);
-                          setIsPlaying(true);
-                        }}
-                        className={`hover:bg-zinc-800/40 cursor-pointer transition-colors group ${
-                          currentTrackIndex === idx ? "bg-cyan-500/10 font-medium" : ""
-                        }`}
-                      >
-                        <td className="px-6 py-4 flex items-center gap-3">
-                          <img
-                            src={t.cover_url}
-                            alt={t.title}
-                            className="w-10 h-10 rounded-lg object-cover shadow"
-                          />
-                          <span className="text-zinc-200 font-semibold">{t.title}</span>
-                        </td>
-                        <td className="px-6 py-4 text-zinc-400">
-                          <div>{t.artist}</div>
-                          <div className="text-xs text-zinc-500">{t.album || "-"}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
-                            {t.original_source}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                          <select
-                            value={t.preferred_provider}
-                            onChange={(e) => handleUpdateProvider(t.id, e.target.value as any)}
-                            className="bg-zinc-900 border border-zinc-700 text-cyan-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 cursor-pointer font-medium"
-                          >
-                            <option value="Spotify">Stream: Spotify</option>
-                            <option value="YouTubeMusic">Stream: YouTube Music</option>
-                            <option value="Tidal">Stream: TIDAL HiFi</option>
-                            <option value="Local">Local Storage</option>
-                          </select>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {t.audio_quality}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right font-mono text-zinc-400">
-                          {formatSeconds(t.duration_secs)}
-                        </td>
-                        <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => handleRemoveTrack(t.id, e)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                            title="Hapus dari playlist"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 3: Audio Hardware & Bit-Perfect Engine */}
-        {activeTab === "devices" && (
-          <div className="flex-1 flex flex-col p-8 overflow-y-auto max-w-4xl w-full mx-auto space-y-6">
+        {/* ========================================================================= */}
+        {/* TAB 4: ACCOUNT (Google Sign-In & Zero-Knowledge Vault)                    */}
+        {/* ========================================================================= */}
+        {activeTab === "account" && (
+          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-300">
+            {/* Header */}
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-                Bit-Perfect Audio Engine
-              </h2>
-              <p className="text-sm text-zinc-400 mt-1">
-                Kendalikan routing audio murni ke DAC eksternal Anda via driver native (WASAPI Exclusive, CoreAudio, ALSA Direct).
+              <h1 className="text-3xl font-extrabold tracking-tight text-white">Akun & WowCloud</h1>
+              <p className="text-sm text-neutral-400 mt-1">
+                Sinkronisasi playlist dan sesi OAuth terenkripsi client-side secara otomatis (AES-256-GCM + Argon2id).
               </p>
             </div>
 
-            {/* Hardware Devices List */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                Terdeteksi Perangkat Output Audio (CPAL Native)
-              </h3>
-              {audioDevices.map((dev) => (
-                <div
-                  key={dev.name}
-                  onClick={() => setSelectedDevice(dev.name)}
-                  className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                    selectedDevice === dev.name
-                      ? "bg-cyan-500/15 border-cyan-500/50 shadow-lg shadow-cyan-500/10"
-                      : "bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/40"
-                  }`}
+            {/* Google Profile Card */}
+            <div className="p-6 rounded-3xl bg-neutral-900/60 border border-white/10 backdrop-blur-2xl shadow-xl space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <img
+                    src={userProfile.avatar_url}
+                    alt={userProfile.name}
+                    className="w-16 h-16 rounded-full object-cover border-2 border-white/20 shadow-lg"
+                  />
+                  <div>
+                    <div className="text-lg font-bold text-white flex items-center gap-2">
+                      {userProfile.name}
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+                    </div>
+                    <div className="text-xs text-neutral-400">{userProfile.email}</div>
+                    <div className="text-[11px] text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Enkripsi Zero-Knowledge Aktif
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setUserProfile((prev) => ({
+                      ...prev,
+                      cloud_synced: !prev.cloud_synced,
+                    }));
+                    showToast(
+                      userProfile.cloud_synced
+                        ? "Sinkronisasi cloud dijeda"
+                        : "Sinkronisasi cloud aktif (AES-256-GCM)",
+                      "info"
+                    );
+                  }}
+                  className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
-                    <Speaker className="w-5 h-5 text-cyan-400" />
-                    <div>
-                      <div className="font-semibold text-zinc-200 flex items-center gap-2">
-                        {dev.name}
-                        {dev.is_default && (
-                          <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                            OS Default
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-0.5">
-                        Max Sample Rate: {(dev.max_sample_rate / 1000).toFixed(1)} kHz · Channels: {dev.supported_channels}
-                      </div>
-                    </div>
-                  </div>
-                  {selectedDevice === dev.name && (
-                    <CheckCircle2 className="w-5 h-5 text-cyan-400" />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Audiophile Toggles */}
-            <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-zinc-200">Bit-Perfect Exclusive Mode</div>
-                  <div className="text-xs text-zinc-400 mt-0.5">
-                    Bypass mixer OS sepenuhnya untuk bitstream murni langsung ke DAC eksternal.
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={bitPerfectExclusive}
-                  onChange={(e) => setBitPerfectExclusive(e.target.checked)}
-                  className="w-5 h-5 accent-cyan-500 cursor-pointer"
-                />
+                  {userProfile.cloud_synced ? "Jeda Sinkronisasi" : "Aktifkan Sinkronisasi"}
+                </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-zinc-200">Auto Sample-Rate Switching</div>
-                  <div className="text-xs text-zinc-400 mt-0.5">
-                    Sesuaikan frekuensi sampling hardware otomatis dengan format file trek (44.1kHz s/d 192kHz).
+              {/* Status Stats */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div className="text-xs text-neutral-400">Status Sinkronisasi</div>
+                  <div className="text-sm font-semibold text-white mt-1 flex items-center gap-2">
+                    <Cloud className={`w-4 h-4 ${userProfile.cloud_synced ? "text-emerald-400" : "text-neutral-500"}`} />
+                    {userProfile.cloud_synced ? "Terhubung ke VPS" : "Offline"}
                   </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={autoSampleRate}
-                  onChange={(e) => setAutoSampleRate(e.target.checked)}
-                  className="w-5 h-5 accent-cyan-500 cursor-pointer"
-                />
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div className="text-xs text-neutral-400">Perangkat Aktif</div>
+                  <div className="text-sm font-semibold text-white mt-1">
+                    {userProfile.active_devices} Perangkat (Linux & Mobile)
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* VIEW 4: WowCloud Vault & Zero-Knowledge Encryption */}
-        {activeTab === "vault" && (
-          <div className="flex-1 flex flex-col p-8 overflow-y-auto max-w-4xl w-full mx-auto space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-                WowCloud Zero-Knowledge Vault
-              </h2>
-              <p className="text-sm text-zinc-400 mt-1">
-                Kredensial dan sesi TIDAL/Spotify Anda dienkripsi secara lokal menggunakan <strong>AES-256-GCM + Argon2id</strong> sebelum disinkronkan ke server cloud VPS (<code>vps-advin</code>).
+            {/* Audio Hardware Output Card (Audiophile / DAC selection) */}
+            <div className="p-5 rounded-2xl bg-neutral-900/40 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-bold text-white">Perangkat Output Audio (ALSA / DAC)</div>
+                <span className="text-[10px] text-rose-400 font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  Bit-Perfect Audio
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Pilih kartu suara atau DAC eksternal untuk direct hardware playback tanpa resampling.
               </p>
+              <select
+                value={selectedDevice}
+                onChange={(e) => {
+                  setSelectedDevice(e.target.value);
+                  showToast(`Audio dialihkan ke: ${e.target.value}`, "success");
+                }}
+                className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/10 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer font-sans"
+              >
+                {audioDevices.map((dev) => (
+                  <option key={dev.name} value={dev.name} className="bg-neutral-900 text-white">
+                    {dev.name} {dev.is_default ? "(Default)" : ""} — Max {dev.max_sample_rate / 1000} kHz
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* TIDAL HiFi Integration Card */}
-            <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-                    <Radio className="w-4 h-4" /> Integrasi Akun TIDAL HiFi (Device Auth Flow)
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Hubungkan akun TIDAL Anda secara aman tanpa memasukkan password di aplikasi.
-                  </p>
-                </div>
-                {tidalConnected ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    TIDAL Connected (HiFi / Lossless)
-                  </span>
-                ) : (
-                  <span className="text-xs text-zinc-500 bg-zinc-800/80 px-2.5 py-1 rounded-full">
-                    Belum Terhubung
-                  </span>
-                )}
-              </div>
+            {/* Provider Integration Cards */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-white">Layanan Musik Terhubung</h2>
 
-              {!tidalConnected ? (
-                <div className="space-y-3 pt-1">
-                  {tidalAuthData ? (
-                    <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 space-y-3 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-cyan-300">Langkah Otorisasi Browser:</span>
-                        <span className="text-[10px] text-zinc-400 font-mono">
-                          Kadaluarsa: {tidalAuthData.expires_in}s
-                        </span>
-                      </div>
-                      <p className="text-zinc-300 leading-relaxed">
-                        1. Buka tautan berikut di browser Anda:{" "}
-                        <a
-                          href={tidalAuthData.verification_uri_complete || `https://${tidalAuthData.verification_uri}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-cyan-400 underline font-semibold hover:text-cyan-300"
-                        >
-                          https://{tidalAuthData.verification_uri}
-                        </a>
-                      </p>
-                      <p className="text-zinc-300">
-                        2. Masukkan kode otorisasi berikut:{" "}
-                        <span className="font-mono text-base font-bold text-yellow-400 px-2.5 py-1 bg-zinc-900 rounded border border-yellow-500/40">
-                          {tidalAuthData.user_code}
-                        </span>
-                      </p>
-                      <div className="flex items-center gap-2 text-zinc-400 text-[11px] pt-1">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                        <span>Menunggu persetujuan login di browser Anda...</span>
+              {/* TIDAL Card */}
+              <div className="p-5 rounded-2xl bg-neutral-900/40 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center font-bold text-white border border-white/10">
+                      T
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">TIDAL HiFi Plus</div>
+                      <div className="text-xs text-neutral-400">
+                        {isTidalConnected ? "Terhubung (Hi-Res Lossless FLAC)" : "Belum Terhubung"}
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={handleStartTidalAuth}
-                      disabled={isTidalBusy}
-                      className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-zinc-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
-                    >
-                      <Radio className="w-4 h-4" />
-                      {isTidalBusy ? "Menghubungi TIDAL..." : "Hubungkan Akun TIDAL (Lossless FLAC)"}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs text-zinc-400">
-                    Sesi token aktif tersimpan aman dalam <span className="text-cyan-400 font-mono">Encrypted SQLite Vault</span>.
                   </div>
+
                   <button
-                    onClick={handleDisconnectTidal}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold border border-red-500/20 transition-colors"
+                    onClick={handleStartTidalAuth}
+                    disabled={isConnectingTidal}
+                    className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    Putuskan Akun
+                    {isConnectingTidal ? "Menghubungi..." : isTidalConnected ? "Hubungkan Ulang" : "Hubungkan TIDAL"}
                   </button>
                 </div>
-              )}
-            </div>
 
-            {/* Interactive Vault Tester */}
-            <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-                <Lock className="w-4 h-4" /> Client-Side Crypto Engine Test
-              </h3>
+                {/* Verification Code Prompt */}
+                {tidalAuthCode && (
+                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/20 text-xs space-y-2">
+                    <div className="font-semibold text-rose-300">
+                      Buka link verifikasi TIDAL di browser Anda:
+                    </div>
+                    <div className="font-mono text-base font-bold text-white tracking-widest bg-black/50 p-2 rounded-lg text-center">
+                      {tidalAuthCode}
+                    </div>
+                    {tidalVerificationUri && (
+                      <a
+                        href={tidalVerificationUri}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-rose-400 hover:underline"
+                      >
+                        Buka {tidalVerificationUri} <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
 
-              <div className="space-y-3 text-sm">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Master Password:</label>
-                  <input
-                    type="password"
-                    value={vaultPassword}
-                    onChange={(e) => setVaultPassword(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Plaintext Token/Session Data:</label>
-                  <input
-                    type="text"
-                    value={vaultPlaintext}
-                    onChange={(e) => setVaultPlaintext(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={handleTestVaultEncrypt}
-                    disabled={isVaultBusy}
-                    className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold rounded-xl text-xs transition-all shadow-md shadow-cyan-500/20"
-                  >
-                    1. Encrypt (AES-256-GCM)
-                  </button>
-                  <button
-                    onClick={handleTestVaultDecrypt}
-                    disabled={isVaultBusy || !encryptedResult}
-                    className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold rounded-xl text-xs transition-all border border-zinc-700 disabled:opacity-40"
-                  >
-                    2. Decrypt Back
-                  </button>
+                {/* Custom Client ID & Token Configuration */}
+                <div className="pt-2 border-t border-white/5">
+                  <details className="text-xs text-neutral-400 cursor-pointer">
+                    <summary className="font-medium text-neutral-300 hover:text-white transition-colors">
+                      Konfigurasi Kustom TIDAL Client ID / Token (Opsional)
+                    </summary>
+                    <div className="space-y-3 pt-3">
+                      <div>
+                        <label className="block text-[11px] text-neutral-400 mb-1">
+                          Custom TIDAL Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={customTidalClientId}
+                          onChange={(e) => setCustomTidalClientId(e.target.value)}
+                          placeholder="Masukkan TIDAL Client ID Anda"
+                          className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-white/30 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-neutral-400 mb-1">
+                          Custom TIDAL Access Token
+                        </label>
+                        <input
+                          type="password"
+                          value={customTidalToken}
+                          onChange={(e) => setCustomTidalToken(e.target.value)}
+                          placeholder="Bearer token OAuth..."
+                          className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-white/30 font-mono"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsTidalConnected(true);
+                          showToast("Kredensial TIDAL kustom berhasil disimpan", "success");
+                        }}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors cursor-pointer"
+                      >
+                        Simpan Kredensial
+                      </button>
+                    </div>
+                  </details>
                 </div>
               </div>
 
-              {/* Ciphertext Output */}
-              {encryptedResult && (
-                <div className="mt-4 p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 font-mono text-xs space-y-2">
-                  <div className="text-zinc-500 text-[10px] uppercase font-bold">Ciphertext (Tersimpan di Cloud):</div>
-                  <div className="text-cyan-400 break-all">{encryptedResult.ciphertext_b64}</div>
-                  <div className="text-zinc-500 text-[10px] pt-1">
-                    Nonce: <span className="text-zinc-300">{encryptedResult.nonce_b64}</span> · Salt: <span className="text-zinc-300">{encryptedResult.salt_b64}</span>
+              {/* Spotify Card */}
+              <div className="p-5 rounded-2xl bg-neutral-900/40 border border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/20 flex items-center justify-center font-bold text-emerald-400">
+                    S
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Spotify</div>
+                    <div className="text-xs text-neutral-400">Terhubung (OAuth Sync)</div>
                   </div>
                 </div>
-              )}
-
-              {/* Decrypted Output */}
-              {decryptedResult && (
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 font-mono text-xs">
-                  <div className="text-emerald-400 text-[10px] uppercase font-bold">Decrypted Plaintext:</div>
-                  <div className="text-zinc-100 font-semibold mt-1">{decryptedResult}</div>
-                </div>
-              )}
+                <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" /> Aktif
+                </span>
+              </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* Bottom Audio Player Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 h-24 bg-zinc-950/90 border-t border-zinc-800/80 backdrop-blur-2xl px-6 flex items-center justify-between z-50">
-        {/* Left: Track Info */}
-        <div className="flex items-center gap-4 w-72 min-w-0">
-          <img
-            src={currentTrack.cover_url}
-            alt={currentTrack.title}
-            className="w-14 h-14 rounded-xl object-cover border border-zinc-800 shadow-md"
-          />
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-zinc-100 truncate">
-              {currentTrack.title}
-            </div>
-            <div className="text-xs text-zinc-400 truncate mt-0.5">
-              {currentTrack.artist}
-            </div>
-            <span className="inline-block mt-1 text-[10px] font-medium text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-              {currentTrack.audio_quality.includes("24-bit") ? "Hi-Res FLAC" : "Lossless"}
-            </span>
-          </div>
-        </div>
-
-        {/* Center: Playback Controls & Progress Bar */}
-        <div className="flex flex-col items-center gap-2 max-w-xl w-full">
-          <div className="flex items-center gap-6">
-            <button className="text-zinc-400 hover:text-zinc-200 transition-colors">
+      {/* ========================================================================= */}
+      {/* FLOATING GLASS BOTTOM PLAYER BAR (Apple Music Pill Dock Layout)           */}
+      {/* ========================================================================= */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-5xl">
+        <div className="flex items-center justify-between px-6 py-3.5 rounded-full bg-neutral-900/80 backdrop-blur-2xl border border-white/12 shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
+          {/* Sisi Kiri: Kontrol Playback (Shuffle, Prev, Play, Next, Repeat) */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsShuffle(!isShuffle)}
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isShuffle ? "text-rose-400" : "text-neutral-400 hover:text-white"
+              }`}
+              title="Shuffle"
+            >
               <Shuffle className="w-4 h-4" />
             </button>
             <button
               onClick={handlePrev}
-              className="text-zinc-300 hover:text-zinc-100 transition-colors"
+              className="p-1.5 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+              title="Previous"
             >
-              <SkipBack className="w-5 h-5" />
+              <SkipBack className="w-4 h-4 fill-current" />
             </button>
+            {/* Play/Pause Button: Solid White Circle dengan Icon Hitam (Khas Apple Music) */}
             <button
               onClick={togglePlay}
-              className="w-11 h-11 rounded-full bg-zinc-100 text-zinc-950 flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-zinc-100/20 font-bold"
+              className="w-10 h-10 rounded-full bg-white hover:scale-105 active:scale-95 text-black flex items-center justify-center shadow-lg transition-transform cursor-pointer"
+              title={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause className="w-5 h-5 fill-current" />
@@ -1279,139 +1249,151 @@ export default function App() {
             </button>
             <button
               onClick={handleNext}
-              className="text-zinc-300 hover:text-zinc-100 transition-colors"
+              className="p-1.5 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+              title="Next"
             >
-              <SkipForward className="w-5 h-5" />
+              <SkipForward className="w-4 h-4 fill-current" />
             </button>
-            <button className="text-zinc-400 hover:text-zinc-200 transition-colors">
+            <button
+              onClick={() => setIsRepeat(!isRepeat)}
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isRepeat ? "text-rose-400" : "text-neutral-400 hover:text-white"
+              }`}
+              title="Repeat"
+            >
               <Repeat className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Progress Timeline Slider */}
-          <div className="w-full flex items-center gap-3 text-xs font-mono text-zinc-500">
-            <span>{formatSeconds(currentTimeMs / 1000)}</span>
-            <input
-              type="range"
-              min={0}
-              max={currentTrack.duration_secs * 1000}
-              value={currentTimeMs}
-              onChange={(e) => handleSeek(Number(e.target.value))}
-              className="flex-1 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+          {/* Sisi Tengah: Track Artwork & Info Ringkas */}
+          <div className="flex items-center gap-3.5 max-w-sm px-4 min-w-0">
+            <img
+              src={currentTrack.cover_url}
+              alt={currentTrack.title}
+              className="w-10 h-10 rounded-xl object-cover shadow border border-white/10 shrink-0"
             />
-            <span>{formatSeconds(currentTrack.duration_secs)}</span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white truncate leading-tight">
+                {currentTrack.title}
+              </div>
+              <div className="text-xs text-neutral-400 truncate leading-tight mt-0.5">
+                {currentTrack.artist}
+              </div>
+            </div>
+            <span className="hidden md:inline-block text-[9px] uppercase font-semibold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-300 shrink-0">
+              {currentTrack.preferred_provider}
+            </span>
+          </div>
+
+          {/* Sisi Kanan: Progress Bar, Volume, dan Quick Toggles */}
+          <div className="flex items-center gap-4">
+            {/* Scrubber Progress Slider */}
+            <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-neutral-400">
+              <span>{formatTime(currentTimeMs)}</span>
+              <input
+                type="range"
+                min={0}
+                max={currentTrack.duration_secs * 1000}
+                value={currentTimeMs}
+                onChange={(e) => handleSeek(Number(e.target.value))}
+                className="w-32 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white hover:accent-rose-400 transition-colors"
+              />
+              <span>{formatTime(currentTrack.duration_secs * 1000)}</span>
+            </div>
+
+            {/* Volume Control */}
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                onClick={() => handleVolumeChange(isMuted ? 0.85 : 0)}
+                className="text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
+              />
+            </div>
+
+            {/* Lyrics Toggle Button */}
+            <button
+              onClick={() => setActiveTab("lyrics")}
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                activeTab === "lyrics"
+                  ? "bg-white/20 text-white"
+                  : "text-neutral-400 hover:text-white hover:bg-white/10"
+              }`}
+              title="Buka Layar Lirik"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Right: Volume & Extra Controls */}
-        <div className="flex items-center justify-end gap-2.5 w-72">
-          <button
-            onClick={handleToggleFloatingLyrics}
-            className="p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-cyan-300 hover:border-cyan-500/40 hover:bg-cyan-500/10 transition-all"
-            title="Toggle Desktop Floating Lyrics"
-          >
-            <PictureInPicture2 className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setActiveTab("now-playing")}
-            className={`p-2 rounded-xl border transition-all ${
-              activeTab === "now-playing"
-                ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
-                : "border-zinc-800 text-zinc-400 hover:text-zinc-200"
-            }`}
-            title="Go to Now Playing & Lyrics"
-          >
-            <Sparkles className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="text-zinc-400 hover:text-zinc-200"
-          >
-            {isMuted || volume === 0 ? (
-              <VolumeX className="w-5 h-5" />
-            ) : (
-              <Volume2 className="w-5 h-5" />
-            )}
-          </button>
-
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={isMuted ? 0 : volume}
-            onChange={(e) => {
-              setVolume(Number(e.target.value));
-              setIsMuted(false);
-            }}
-            className="w-24 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-          />
-        </div>
-      </footer>
-
-      {/* Modal: Buat Playlist Baru */}
-      {isCreatePlaylistOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-5">
+      {/* Modal Buat Playlist Modern */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-neutral-900 border border-white/15 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                  <FolderPlus className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-lg text-zinc-100">Buat Playlist Baru</h3>
-              </div>
+              <h3 className="text-lg font-bold text-white">Buat Playlist Baru</h3>
               <button
-                onClick={() => setIsCreatePlaylistOpen(false)}
-                className="p-1 text-zinc-400 hover:text-zinc-200 rounded-lg hover:bg-zinc-800"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-neutral-400 hover:text-white p-1"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-medium text-neutral-300 mb-1">
                   Nama Playlist
                 </label>
                 <input
                   type="text"
-                  placeholder="cth. Nostalgia 90s, Focus Coding, Audiophile Picks..."
-                  value={newPlaylistTitle}
-                  onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500"
-                  autoFocus
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Misal: Hi-Res Jazz & Acoustic"
+                  className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/10 text-white text-sm focus:outline-none focus:border-white/30"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-medium text-neutral-300 mb-1">
                   Deskripsi (Opsional)
                 </label>
                 <textarea
-                  placeholder="Koleksi lagu campuran antar-provider..."
-                  rows={3}
-                  value={newPlaylistDesc}
-                  onChange={(e) => setNewPlaylistDesc(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 resize-none text-xs"
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  placeholder="Koleksi lagu universal lintas provider..."
+                  rows={2}
+                  className="w-full px-4 py-2 rounded-xl bg-black/60 border border-white/10 text-white text-sm focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
-                onClick={() => setIsCreatePlaylistOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 rounded-full text-xs font-medium text-neutral-300 hover:text-white transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 onClick={handleCreatePlaylist}
-                disabled={!newPlaylistTitle.trim()}
-                className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-zinc-950 text-xs font-bold rounded-xl transition-all shadow-lg shadow-cyan-500/20"
+                className="px-5 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-neutral-200 transition-colors shadow-lg cursor-pointer"
               >
-                Simpan Playlist
+                Simpan
               </button>
             </div>
           </div>
