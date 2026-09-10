@@ -389,8 +389,33 @@ Pengguna mengkritik keras munculnya pop-up modal dan notifikasi saat ingin memut
   - Membuat skill `.agents/skills/wowmusic-core/SKILL.md` yang merangkum aturan emas arsitektur, testing nyata, zero-slop UX, dan kepatuhan mutlak dokumentasi.
   - Memperbarui aturan besi di `AGENTS.md`.
 
+---
 
+## [MEM-015] Peresmian Direktori Manajemen Perencanaan `plans/` (Drafts, Active, Finished)
+- **Waktu Pencatatan**: 2026-09-10 17:39:45 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Governance / Project Management
+- **Status**: Implemented & Verified (Active)
 
+### 1. Konteks & Latar Belakang
+Sesuai arahan eksplisit pengguna (*"Kamu buatkan folder Plan disana didalamnya file plan semua, dan didalam folder plan buatkan juga Finished, Draft, atau apalah"*), diperlukan sistem manajemen file perencanaan yang terpusat dan terstruktur di root proyek untuk mendokumentasikan setiap roadmap, proposal fitur, status pengerjaan, dan riwayat milestone.
 
+### 2. Arahan Pengguna & Keputusan Kunci
+- Membuat folder `plans/` di root workspace dengan 3 subdirektori status:
+  - `plans/drafts/`: Menampung rancangan ide, refactor, atau arsitektur baru yang belum dieksekusi.
+  - `plans/active/`: Menampung dokumen plan yang telah disetujui pengguna dan sedang aktif dieksekusi.
+  - `plans/finished/`: Menampung dokumen plan yang telah 100% selesai dikerjakan dan diverifikasi.
+- Membuat panduan tata kelola dan template standar di `plans/README.md`.
+- Mengabadikan milestone yang telah rampung ke dalam folder `plans/finished/`:
+  - `PLAN-001-core-architecture-and-audio.md`
+  - `PLAN-002-universal-search-and-resolver.md`
+  - `PLAN-003-consumer-ui-and-real-lyrics.md`
+- Merancang roadmap terdekat ke dalam folder `plans/drafts/`:
+  - `PLAN-004-local-audio-file-importer.md`
+  - `PLAN-005-wowcloud-vault-sync.md`
+  - `PLAN-006-cross-device-handoff.md`
+- Mengintegrasikan siklus perpindahan plan (`drafts/` ➔ `active/` ➔ `finished/`) secara resmi ke dalam `AGENTS.md`.
 
-
+### 3. Dampak Teknis & File Terkait
+- Terciptanya repositori dokumen rencana kerja yang rapi, terlacak di Git, dan transparan.
+- Berkas terkait: `plans/README.md`, `plans/finished/*`, `plans/drafts/*`, `plans/active/.gitkeep`, `AGENTS.md`, `MEMORY.md`.

@@ -13,6 +13,7 @@ Dokumen ini adalah pedoman operasional mutlak bagi AI Agent (Antigravity, Cursor
 > Setiap kali ada penambahan fitur, perubahan kode, perbaikan bug, koreksi arsitektur, refactor, ataupun revisi:
 > 
 > 1. **WAJIB Membuat Plan Implementasi Terlebih Dahulu**:
+>    - Buat berkas rencana di direktori `plans/drafts/PLAN-XXX-<nama-fitur>.md` mengacu pada [plans/README.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/README.md).
 >    - Uraikan latar belakang masalah / kebutuhan fitur.
 >    - Sebutkan secara spesifik file mana saja yang akan dibuat atau dimodifikasi.
 >    - Tuliskan langkah-langkah kerja teknis (*step-by-step breakdown*) secara jelas dan rinci.
@@ -23,8 +24,10 @@ Dokumen ini adalah pedoman operasional mutlak bagi AI Agent (Antigravity, Cursor
 >    - **DILARANG KERAS** menyentuh file kode, menjalankan edit file, atau melakukan eksekusi sebelum pengguna memberikan persetujuan eksplisit (misal: *"Setuju"*, *"Lanjutkan"*, *"Oke Gass"*).
 > 
 > 3. **Eksekusi Terkendali Sesuai Plan**:
+>    - Pindahkan plan dari `plans/drafts/` ke `plans/active/`.
 >    - Kerjakan implementasi secara disiplin hanya mengikuti poin-poin yang disetujui.
 >    - Jika di tengah jalan ditemukan kendala teknis atau kebutuhan baru di luar cakupan plan, **BERHENTI SEGERA**, lalu ajukan revisi plan kepada pengguna untuk ditinjau ulang.
+>    - Setelah seluruh kriteria selesai dan diverifikasi nyata, pindahkan plan dari `plans/active/` ke `plans/finished/` dan catat ke `MEMORY.md`.
 >
 > 4. **WAJIB Verifikasi Fungsi Nyata (Real End-to-End Testing - NO FAKE / NO SLOP)**:
 >    - **Dilarang Keras Klaim Palsu**: Dilarang mengklaim fitur selesai hanya karena kode lulus `cargo check` atau sekadar timer `setInterval` palsu di frontend.
