@@ -2,6 +2,7 @@ pub mod aggregator;
 pub mod audio;
 pub mod db;
 pub mod lyrics;
+pub mod tidal;
 pub mod vault;
 
 use aggregator::{IsrcMatcher, MatchConfidence, UnifiedTrack};
@@ -10,11 +11,13 @@ use db::{Database, Playlist, TrackItem};
 use lyrics::{LyricsEngine, LyricsPayload};
 use std::sync::Arc;
 use tauri::{Manager, State};
+use tidal::{DeviceAuthResponse, TidalClient, TidalPlaybackInfo, TidalToken, TidalTrack};
 use vault::{CryptoVault, EncryptedVaultItem};
 
 pub struct AppState {
     pub audio_engine: Arc<AudioEngine>,
     pub db: Arc<Database>,
+    pub tidal: Arc<TidalClient>,
 }
 
 #[tauri::command]
@@ -162,6 +165,42 @@ fn db_update_preferred_provider(
         .map_err(|e| e.to_string())
 }
 
+// TIDAL IPC commands
+#[tauri::command]
+async fn tidal_start_device_auth(state: State<'_, AppState>) -> Result<DeviceAuthResponse, String> {
+    state.tidal.start_device_auth().await
+}
+
+#[tauri::command]
+async fn tidal_poll_device_token(
+    state: State<'_, AppState>,
+    device_code: String,
+) -> Result<TidalToken, String> {
+    state.tidal.poll_device_token(&device_code).await
+}
+
+#[tauri::command]
+async fn tidal_search_track(
+    state: State<'_, AppState>,
+    query: String,
+    token: Option<String>,
+) -> Result<Vec<TidalTrack>, String> {
+    state.tidal.search_track(&query, token.as_deref()).await
+}
+
+#[tauri::command]
+async fn tidal_get_playback_info(
+    state: State<'_, AppState>,
+    track_id: u64,
+    token: String,
+    quality: Option<String>,
+) -> Result<TidalPlaybackInfo, String> {
+    state
+        .tidal
+        .get_playback_info(track_id, &token, quality.as_deref())
+        .await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -181,6 +220,7 @@ pub fn run() {
             let app_state = AppState {
                 audio_engine: Arc::new(AudioEngine::new()),
                 db: Arc::new(database),
+                tidal: Arc::new(TidalClient::new()),
             };
             app.manage(app_state);
             Ok(())
@@ -204,6 +244,10 @@ pub fn run() {
             db_add_track_to_playlist,
             db_remove_track_from_playlist,
             db_update_preferred_provider,
+            tidal_start_device_auth,
+            tidal_poll_device_token,
+            tidal_search_track,
+            tidal_get_playback_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

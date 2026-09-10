@@ -184,3 +184,24 @@ Sebelumnya antrean lagu dan playlist hanya tersimpan sementara dalam memori fron
 - Pendaftaran IPC commands di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
 - Integrasi UI frontend di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 
+---
+
+## [MEM-008] Implementasi TIDAL OAuth Device Code Flow & Stream Resolver (Milestone v0.3.0)
+- **Waktu Pencatatan**: 2026-09-10 16:42:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Fitur / Integrasi Provider / Keamanan
+- **Status**: Implemented (Active)
+
+### 1. Konteks & Latar Belakang
+Pengguna bersedia menghubungkan akun TIDAL untuk pengujian langsung streaming lossless nyata demi percepatan development. Diperlukan alur otentikasi yang aman dan praktis tanpa mengharuskan pengguna mengetik password di aplikasi atau membagikan token mentah di chat.
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- Mengimplementasikan alur **OAuth2 Device Authorization Flow** resmi: aplikasi meminta kode perangkat dan memberikan link otorisasi browser (`https://link.tidal.com`), pengguna menyetujui di browser pribadinya, dan token streaming diterima otomatis oleh aplikasi.
+- Menambahkan fungsi pencarian katalog trek TIDAL dan resolusi manifest pemutaran audio lossless (`playbackinfopostpaywall`).
+- Menambahkan kartu integrasi TIDAL HiFi di tab WowCloud Vault dengan status visual terhubung dan tombol pemutus akun.
+
+### 3. Dampak Teknis & File Terkait
+- Modul baru [src-tauri/src/tidal/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/tidal/mod.rs) dengan 2 unit test (9/9 unit tests PASS).
+- Pendaftaran IPC commands (`tidal_start_device_auth`, `tidal_poll_device_token`, `tidal_search_track`, `tidal_get_playback_info`) di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
+- Integrasi UI di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+

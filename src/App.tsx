@@ -152,6 +152,19 @@ export default function App() {
   const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState<string>("");
 
+  // TIDAL Device Auth State
+  const [tidalAuthData, setTidalAuthData] = useState<{
+    device_code: string;
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    expires_in: number;
+    interval: number;
+  } | null>(null);
+  const [tidalConnected, setTidalConnected] = useState<boolean>(false);
+  const [isTidalBusy, setIsTidalBusy] = useState<boolean>(false);
+  const [, setTidalToken] = useState<string>("");
+
   // Aggregator inputs
   const [playlistUrlInput, setPlaylistUrlInput] = useState<string>("");
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -496,6 +509,53 @@ export default function App() {
     } finally {
       setIsVaultBusy(false);
     }
+  };
+
+  const handleStartTidalAuth = async () => {
+    setIsTidalBusy(true);
+    try {
+      const authResp = await invoke<{
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        verification_uri_complete?: string;
+        expires_in: number;
+        interval: number;
+      }>("tidal_start_device_auth");
+      setTidalAuthData(authResp);
+      pollTidalToken(authResp.device_code, authResp.interval || 5);
+    } catch (err) {
+      alert("Gagal menghubungi TIDAL Auth: " + err);
+    } finally {
+      setIsTidalBusy(false);
+    }
+  };
+
+  const pollTidalToken = (deviceCode: string, intervalSecs: number) => {
+    const timer = setInterval(async () => {
+      try {
+        const tokenResp = await invoke<{
+          access_token: string;
+          refresh_token?: string;
+          user_id?: number;
+        }>("tidal_poll_device_token", { deviceCode });
+
+        if (tokenResp && tokenResp.access_token) {
+          clearInterval(timer);
+          setTidalToken(tokenResp.access_token);
+          setTidalConnected(true);
+          setTidalAuthData(null);
+        }
+      } catch (e) {
+        // Pending approval from browser, continue polling
+      }
+    }, Math.max(intervalSecs, 3) * 1000);
+  };
+
+  const handleDisconnectTidal = () => {
+    setTidalConnected(false);
+    setTidalToken("");
+    setTidalAuthData(null);
   };
 
   const formatSeconds = (totalSec: number) => {
@@ -966,6 +1026,87 @@ export default function App() {
               <p className="text-sm text-zinc-400 mt-1">
                 Kredensial dan sesi TIDAL/Spotify Anda dienkripsi secara lokal menggunakan <strong>AES-256-GCM + Argon2id</strong> sebelum disinkronkan ke server cloud VPS (<code>vps-advin</code>).
               </p>
+            </div>
+
+            {/* TIDAL HiFi Integration Card */}
+            <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                    <Radio className="w-4 h-4" /> Integrasi Akun TIDAL HiFi (Device Auth Flow)
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Hubungkan akun TIDAL Anda secara aman tanpa memasukkan password di aplikasi.
+                  </p>
+                </div>
+                {tidalConnected ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    TIDAL Connected (HiFi / Lossless)
+                  </span>
+                ) : (
+                  <span className="text-xs text-zinc-500 bg-zinc-800/80 px-2.5 py-1 rounded-full">
+                    Belum Terhubung
+                  </span>
+                )}
+              </div>
+
+              {!tidalConnected ? (
+                <div className="space-y-3 pt-1">
+                  {tidalAuthData ? (
+                    <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-cyan-300">Langkah Otorisasi Browser:</span>
+                        <span className="text-[10px] text-zinc-400 font-mono">
+                          Kadaluarsa: {tidalAuthData.expires_in}s
+                        </span>
+                      </div>
+                      <p className="text-zinc-300 leading-relaxed">
+                        1. Buka tautan berikut di browser Anda:{" "}
+                        <a
+                          href={tidalAuthData.verification_uri_complete || `https://${tidalAuthData.verification_uri}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-cyan-400 underline font-semibold hover:text-cyan-300"
+                        >
+                          https://{tidalAuthData.verification_uri}
+                        </a>
+                      </p>
+                      <p className="text-zinc-300">
+                        2. Masukkan kode otorisasi berikut:{" "}
+                        <span className="font-mono text-base font-bold text-yellow-400 px-2.5 py-1 bg-zinc-900 rounded border border-yellow-500/40">
+                          {tidalAuthData.user_code}
+                        </span>
+                      </p>
+                      <div className="flex items-center gap-2 text-zinc-400 text-[11px] pt-1">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                        <span>Menunggu persetujuan login di browser Anda...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleStartTidalAuth}
+                      disabled={isTidalBusy}
+                      className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-zinc-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+                    >
+                      <Radio className="w-4 h-4" />
+                      {isTidalBusy ? "Menghubungi TIDAL..." : "Hubungkan Akun TIDAL (Lossless FLAC)"}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-zinc-400">
+                    Sesi token aktif tersimpan aman dalam <span className="text-cyan-400 font-mono">Encrypted SQLite Vault</span>.
+                  </div>
+                  <button
+                    onClick={handleDisconnectTidal}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold border border-red-500/20 transition-colors"
+                  >
+                    Putuskan Akun
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Interactive Vault Tester */}
