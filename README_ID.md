@@ -77,11 +77,12 @@ pnpm tauri dev
 - [x] Scaffolding Tauri v2 + Rust Core + React 19 UI
 - [x] Client-Side Crypto Vault (AES-256-GCM + Argon2id)
 - [x] Live Lyrics Engine (LRCLIB Client & LRC Parser)
-- [ ] Fase 1: CRUD Sistem Playlist Mandiri & Import Multi-Platform
-- [ ] Fase 2: Router Pemutaran Multi-Provider (Spotify, YouTube Music, TIDAL, Lokal)
-- [ ] Fase 3: Deployment WowCloud Vault & Sinkronisasi Playlist (VPS `vps-advin`)
-- [ ] Fase 4: Cross-Device Remote Control & Handoff
-- [ ] Fase 5: Rilis Resmi Multiplatform (Linux, Windows, macOS, Android, iOS)
+- [x] CRUD Sistem Playlist Mandiri & SQLite Persistent Storage (v0.2.0)
+- [x] Integrasi TIDAL HiFi OAuth2 Device Code Flow & Stream Resolver (v0.3.0)
+- [x] Live Lyrics Click-to-Seek & Desktop Floating Overlay (v0.4.0)
+- [ ] Router Pemutaran Multi-Provider & Real URL Importer (Spotify, YouTube Music, Lokal)
+- [ ] Deployment WowCloud Vault & Sinkronisasi Playlist (VPS `vps-advin` / WebSocket Handoff)
+- [ ] Rilis Resmi Multiplatform (Linux, Windows, macOS, Android, iOS)
 
 ---
 

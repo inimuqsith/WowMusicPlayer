@@ -201,6 +201,39 @@ async fn tidal_get_playback_info(
         .await
 }
 
+#[tauri::command]
+async fn toggle_floating_lyrics(app: tauri::AppHandle) -> Result<bool, String> {
+    if let Some(overlay) = app.get_webview_window("lyrics-overlay") {
+        if overlay.is_visible().unwrap_or(false) {
+            let _ = overlay.hide();
+            return Ok(false);
+        } else {
+            let _ = overlay.show();
+            let _ = overlay.set_focus();
+            return Ok(true);
+        }
+    }
+
+    let overlay = tauri::WebviewWindowBuilder::new(
+        &app,
+        "lyrics-overlay",
+        tauri::WebviewUrl::App("index.html?window=overlay".into()),
+    )
+    .title("WowMusic Floating Lyrics")
+    .inner_size(520.0, 140.0)
+    .min_inner_size(360.0, 100.0)
+    .resizable(true)
+    .transparent(true)
+    .always_on_top(true)
+    .decorations(false)
+    .shadow(false)
+    .build()
+    .map_err(|e| format!("Failed to create floating window: {}", e))?;
+
+    let _ = overlay.show();
+    Ok(true)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -248,6 +281,7 @@ pub fn run() {
             tidal_poll_device_token,
             tidal_search_track,
             tidal_get_playback_info,
+            toggle_floating_lyrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -205,3 +205,28 @@ Pengguna bersedia menghubungkan akun TIDAL untuk pengujian langsung streaming lo
 - Pendaftaran IPC commands (`tidal_start_device_auth`, `tidal_poll_device_token`, `tidal_search_track`, `tidal_get_playback_info`) di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
 - Integrasi UI di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 
+---
+
+## [MEM-009] Implementasi Live Lyrics Click-to-Seek & Desktop Floating Overlay (Milestone v0.4.0)
+- **Waktu Pencatatan**: 2026-09-10 16:48:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Fitur / UI & UX / Multi-Window
+- **Status**: Implemented (Active)
+
+### 1. Konteks & Latar Belakang
+Pengguna menginginkan pengalaman lirik imersif di mana lirik dapat diklik untuk melompatkan posisi pemutaran (*click-to-seek*), serta widget lirik melayang (*desktop floating overlay*) yang tetap terlihat di atas aplikasi lain saat pengguna sedang bekerja atau mengetik.
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- Mengimplementasikan *Click-to-Seek* di tab Now Playing dengan hover badge timestamp (`MM:SS`) dan highlight neon karaoke aktif.
+- Menambahkan arsitektur multi-window Tauri v2: window sekunder `lyrics-overlay` yang bersifat borderless, transparan, always-on-top, dan draggable via `data-tauri-drag-region`.
+- Menggunakan `BroadcastChannel` lokal untuk sinkronisasi state pemutaran (lirik aktif, lirik berikutnya, progress pemutaran, kontrol play/pause) secara instan antar-jendela tanpa latensi.
+- Menambahkan tombol toggle Floating Widget di header panel lirik dan player bar bawah.
+- Memperbarui checklist roadmap di [README.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/README.md) dan [README_ID.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/README_ID.md).
+
+### 3. Dampak Teknis & File Terkait
+- Pembuatan komponen [src/components/FloatingLyrics.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/components/FloatingLyrics.tsx).
+- Routing multi-window di [src/main.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/main.tsx).
+- Penambahan IPC command `toggle_floating_lyrics` di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
+- Konfigurasi window di [src-tauri/tauri.conf.json](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/tauri.conf.json).
+- Integrasi UI di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+

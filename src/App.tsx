@@ -24,6 +24,7 @@ import {
   ListMusic,
   FolderPlus,
   X,
+  PictureInPicture2,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -319,6 +320,46 @@ export default function App() {
       }
     }
   }, [activeLyricIndex]);
+
+  // Broadcast lyrics & playback state to Floating Overlay
+  useEffect(() => {
+    const channel = new BroadcastChannel("wowmusic_lyrics_channel");
+
+    channel.onmessage = (event) => {
+      if (event.data?.type === "TOGGLE_PLAY") {
+        togglePlay();
+      }
+    };
+
+    const currentLine = lyrics[activeLyricIndex];
+    const nextLine = lyrics[activeLyricIndex + 1];
+
+    channel.postMessage({
+      type: "LYRICS_SYNC",
+      payload: {
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        currentLineText: currentLine ? currentLine.text : "♪ ...",
+        nextLineText: nextLine ? nextLine.text : "",
+        currentTimeMs,
+        durationSecs: currentTrack.duration_secs,
+        isPlaying,
+      },
+    });
+
+    return () => {
+      channel.close();
+    };
+  }, [currentTrack, activeLyricIndex, currentTimeMs, isPlaying, lyrics]);
+
+  const handleToggleFloatingLyrics = async () => {
+    try {
+      await invoke("toggle_floating_lyrics");
+    } catch (err) {
+      console.warn("Toggle floating lyrics fallback:", err);
+      window.open("?window=overlay", "lyrics-overlay", "width=520,height=140");
+    }
+  };
 
   const togglePlay = async () => {
     const nextState = !isPlaying;
@@ -757,9 +798,20 @@ export default function App() {
                     Immersive Live Lyrics
                   </h3>
                 </div>
-                <span className="text-xs font-mono text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded">
-                  {lyricsSource}
-                </span>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={handleToggleFloatingLyrics}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-500/30 transition-all shadow-sm"
+                    title="Buka Widget Lirik Mengambang di Desktop"
+                  >
+                    <PictureInPicture2 className="w-3.5 h-3.5" />
+                    <span>Floating Widget</span>
+                  </button>
+                  <span className="text-xs font-mono text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded">
+                    {lyricsSource}
+                  </span>
+                </div>
               </div>
 
               {/* Scrolling Lyrics Container */}
@@ -773,13 +825,17 @@ export default function App() {
                     <div
                       key={idx}
                       onClick={() => handleSeek(line.timestamp_ms as number)}
-                      className={`cursor-pointer transition-all duration-300 text-lg md:text-xl font-medium tracking-tight rounded-xl px-4 py-2 ${
+                      className={`group relative cursor-pointer transition-all duration-300 text-lg md:text-xl font-medium tracking-tight rounded-xl px-4 py-2.5 flex items-center justify-between ${
                         isActive
-                          ? "text-cyan-300 font-bold text-2xl scale-[1.02] bg-cyan-500/10 border-l-4 border-cyan-400 shadow-lg shadow-cyan-500/10"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30"
+                          ? "text-cyan-300 font-bold text-2xl scale-[1.02] bg-cyan-500/15 border-l-4 border-cyan-400 shadow-xl shadow-cyan-500/15"
+                          : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40"
                       }`}
+                      title="Klik lirik untuk langsung melompat ke detik ini"
                     >
-                      {line.text}
+                      <span>{line.text}</span>
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-mono text-zinc-400 bg-zinc-800/90 px-2 py-0.5 rounded ml-3 shrink-0">
+                        {formatSeconds(Math.floor(line.timestamp_ms / 1000))}
+                      </span>
                     </div>
                   );
                 })}
@@ -1248,7 +1304,15 @@ export default function App() {
         </div>
 
         {/* Right: Volume & Extra Controls */}
-        <div className="flex items-center justify-end gap-3 w-72">
+        <div className="flex items-center justify-end gap-2.5 w-72">
+          <button
+            onClick={handleToggleFloatingLyrics}
+            className="p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-cyan-300 hover:border-cyan-500/40 hover:bg-cyan-500/10 transition-all"
+            title="Toggle Desktop Floating Lyrics"
+          >
+            <PictureInPicture2 className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => setActiveTab("now-playing")}
             className={`p-2 rounded-xl border transition-all ${
@@ -1256,7 +1320,7 @@ export default function App() {
                 ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
                 : "border-zinc-800 text-zinc-400 hover:text-zinc-200"
             }`}
-            title="Toggle Live Lyrics"
+            title="Go to Now Playing & Lyrics"
           >
             <Sparkles className="w-4 h-4" />
           </button>
