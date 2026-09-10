@@ -22,6 +22,10 @@ import {
   ExternalLink,
   Search,
   Loader2,
+  Radio,
+  Link2,
+  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { ToastContainer, ToastMessage } from "./components/Toast";
@@ -217,12 +221,28 @@ export default function App() {
     audio_quality_preset: "Hi-Fi Lossless",
   });
 
-  // TIDAL Connection State
+  // Primary Playback Provider Setting
+  const [primaryProvider, setPrimaryProvider] = useState<"Tidal" | "Spotify" | "Local" | "Preview">(() => {
+    return (localStorage.getItem("wowmusic_primary_provider") as any) || "Tidal";
+  });
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [unlinkedProviderTarget, setUnlinkedProviderTarget] = useState<string>("Tidal");
+
+  // TIDAL Connection State & Token Persistence
   const [isConnectingTidal, setIsConnectingTidal] = useState(false);
   const [tidalAuthCode, setTidalAuthCode] = useState<string | null>(null);
   const [tidalVerificationUri, setTidalVerificationUri] = useState<string | null>(null);
   const [pollIntervalId, setPollIntervalId] = useState<any>(null);
-  const [isTidalConnected, setIsTidalConnected] = useState(false);
+  const [tidalToken, setTidalToken] = useState<string | null>(() => {
+    return localStorage.getItem("wowmusic_tidal_token") || null;
+  });
+  const [isTidalConnected, setIsTidalConnected] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem("wowmusic_tidal_token"));
+  });
+
+  // Dynamic Home Chart Tracks (Live Worldwide Music Hub)
+  const [homeTracks, setHomeTracks] = useState<UnifiedTrackItem[]>(INITIAL_CURATED_TRACKS);
+  const [isLoadingHome, setIsLoadingHome] = useState(false);
 
   // Create Playlist Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -291,8 +311,51 @@ export default function App() {
     }
   };
 
+  // Fetch live worldwide trending tracks for Home (Bebas Login)
+  const fetchTopCharts = async () => {
+    setIsLoadingHome(true);
+    try {
+      const resp = await fetch("https://itunes.apple.com/us/rss/topsongs/limit=30/json");
+      const data = await resp.json();
+      const entries = data.feed?.entry || [];
+      const mapped: UnifiedTrackItem[] = entries.map((e: any, idx: number) => {
+        const id = e.id?.attributes?.["im:id"] || `chart-${idx}`;
+        const title = e["im:name"]?.label || "Unknown Title";
+        const artist = e["im:artist"]?.label || "Unknown Artist";
+        const album = e["im:collection"]?.["im:name"]?.label || "";
+        const coverRaw = e["im:image"]?.[2]?.label || e["im:image"]?.[0]?.label || "";
+        const cover = coverRaw.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+        const previewUrl =
+          e.link?.find((l: any) => l.attributes?.["im:assetType"] === "preview")?.attributes?.href ||
+          e.link?.[1]?.attributes?.href ||
+          "";
+        return {
+          id: String(id),
+          title,
+          artist,
+          album,
+          duration_secs: 30,
+          original_source: "AppleMusic" as const,
+          preferred_provider: "Tidal" as const,
+          cover_url: cover,
+          audio_quality: "Studio Master 256kbps",
+          stream_url: previewUrl,
+        };
+      });
+
+      if (mapped.length > 0) {
+        setHomeTracks(mapped);
+      }
+    } catch (err) {
+      console.warn("Gagal memuat chart global:", err);
+    } finally {
+      setIsLoadingHome(false);
+    }
+  };
+
   useEffect(() => {
     loadPlaylists();
+    fetchTopCharts();
   }, []);
 
   // 2. Lyrics Fetching
@@ -398,8 +461,66 @@ export default function App() {
     };
   }, [currentTrack, activeLyricIndex, currentTimeMs, isPlaying, lyrics]);
 
-  // Playback actions
-  const playTrackAt = (idx: number, trackList?: UnifiedTrackItem[]) => {
+  // Helper: Resolve full-length audio stream via TIDAL API
+  const resolveTidalStream = async (
+    track: UnifiedTrackItem,
+    token: string
+  ): Promise<{ streamUrl: string; durationSecs?: number } | null> => {
+    try {
+      const query = `${track.title} ${track.artist}`;
+      const searchResp = await fetch(
+        `https://api.tidal.com/v1/search/tracks?query=${encodeURIComponent(query)}&limit=1&countryCode=US`,
+        {
+          headers: {
+            "x-tidal-token": "fX2JxdmntZWK0ixT",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!searchResp.ok) return null;
+      const sData = await searchResp.json();
+      const item = sData.items?.[0];
+      if (!item?.id) return null;
+
+      // Request playback info from TIDAL (try LOSSLESS first, fallback to HIGH)
+      let pbResp = await fetch(
+        `https://api.tidal.com/v1/tracks/${item.id}/playbackinfopostpaywall?audioquality=LOSSLESS&playbackmode=STREAM&assetpresentation=FULL`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!pbResp.ok) {
+        pbResp = await fetch(
+          `https://api.tidal.com/v1/tracks/${item.id}/playbackinfopostpaywall?audioquality=HIGH&playbackmode=STREAM&assetpresentation=FULL`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
+      if (!pbResp.ok) return null;
+      const pbData = await pbResp.json();
+      if (!pbData.manifest) return null;
+
+      if (pbData.manifestMimeType === "application/vnd.tidal.bts") {
+        const decoded = JSON.parse(atob(pbData.manifest));
+        if (decoded.urls && decoded.urls.length > 0) {
+          return {
+            streamUrl: decoded.urls[0],
+            durationSecs: item.duration || track.duration_secs,
+          };
+        }
+      }
+      return null;
+    } catch (err) {
+      console.warn("TIDAL stream resolution error:", err);
+      return null;
+    }
+  };
+
+  // Playback actions with Smart Multi-Provider & Full-Length Resolver
+  const playTrackAt = async (idx: number, trackList?: UnifiedTrackItem[]) => {
     const list = trackList || tracks;
     if (idx < 0 || idx >= list.length) return;
     const trk = list[idx];
@@ -411,19 +532,50 @@ export default function App() {
     setCurrentTimeMs(0);
     setIsPlaying(true);
 
-    if (audioRef.current && trk.stream_url) {
-      audioRef.current.src = trk.stream_url;
+    let finalStreamUrl = trk.stream_url;
+    let finalQuality = trk.audio_quality;
+    let isFullPlayback = false;
+
+    // Check primary provider setting & connected services
+    if (primaryProvider === "Tidal") {
+      if (tidalToken) {
+        showToast(`Mencari stream TIDAL HiFi: ${trk.title}...`, "info");
+        const resolved = await resolveTidalStream(trk, tidalToken);
+        if (resolved?.streamUrl) {
+          finalStreamUrl = resolved.streamUrl;
+          finalQuality = "TIDAL Master Lossless";
+          isFullPlayback = true;
+          showToast(`Memutar lagu penuh via TIDAL: ${trk.title}`, "success", "TIDAL HiFi");
+        } else {
+          showToast(`Trek tidak ditemukan di TIDAL. Menggunakan pratinjau studio.`, "warning");
+        }
+      } else {
+        // Unlinked provider! Popup modal appears to prompt linking
+        setUnlinkedProviderTarget("Tidal");
+        setIsLinkModalOpen(true);
+        showToast(`TIDAL belum tertaut. Memutar pratinjau studio 30s.`, "info");
+      }
+    } else if (primaryProvider === "Spotify") {
+      setUnlinkedProviderTarget("Spotify");
+      setIsLinkModalOpen(true);
+      showToast(`Spotify belum tertaut. Memutar pratinjau studio 30s.`, "info");
+    }
+
+    if (audioRef.current && finalStreamUrl) {
+      audioRef.current.src = finalStreamUrl;
       audioRef.current.play().catch((err) => console.warn("Audio play error:", err));
     }
 
     // Sync with backend
     invoke("play_track", {
       trackId: trk.id,
-      durationMs: trk.duration_secs * 1000,
-      qualityLabel: trk.audio_quality,
+      durationMs: isFullPlayback ? trk.duration_secs * 1000 : 30000,
+      qualityLabel: finalQuality,
     }).catch(() => {});
 
-    showToast(`Memutar: ${trk.title} - ${trk.artist}`, "info");
+    if (!isFullPlayback && primaryProvider === "Preview") {
+      showToast(`Memutar: ${trk.title} - ${trk.artist} (Preview)`, "info");
+    }
   };
 
   const togglePlay = () => {
@@ -627,8 +779,10 @@ export default function App() {
             clearInterval(timer);
             setPollIntervalId(null);
             setIsTidalConnected(true);
+            setTidalToken(token.access_token);
+            localStorage.setItem("wowmusic_tidal_token", token.access_token);
             setTidalAuthCode(null);
-            showToast("Akun TIDAL HiFi berhasil terhubung! Streaming Hi-Res Lossless aktif.", "success", "TIDAL Terhubung");
+            showToast("Akun TIDAL HiFi berhasil terhubung! Pemutaran lagu penuh (Master Lossless) aktif.", "success", "TIDAL Terhubung");
           }
         } catch (err: any) {
           clearInterval(timer);
@@ -652,6 +806,27 @@ export default function App() {
     }
     setTidalAuthCode(null);
     showToast("Pairing TIDAL dibatalkan", "info");
+  };
+
+  const handleDisconnectTidal = () => {
+    localStorage.removeItem("wowmusic_tidal_token");
+    setTidalToken(null);
+    setIsTidalConnected(false);
+    showToast("Akun TIDAL diputuskan. Pemutaran dialihkan ke mode preview studio.", "info");
+  };
+
+  const handleSelectPrimaryProvider = (provider: "Tidal" | "Spotify" | "Local" | "Preview") => {
+    setPrimaryProvider(provider);
+    localStorage.setItem("wowmusic_primary_provider", provider);
+    showToast(`Provider utama diatur ke: ${provider}`, "info");
+
+    if (provider === "Tidal" && !isTidalConnected) {
+      setUnlinkedProviderTarget("Tidal");
+      setIsLinkModalOpen(true);
+    } else if (provider === "Spotify") {
+      setUnlinkedProviderTarget("Spotify");
+      setIsLinkModalOpen(true);
+    }
   };
 
   // Playlist Management
@@ -834,133 +1009,145 @@ export default function App() {
               </p>
             </div>
 
-            {/* Featured Artists Quick Discovery */}
+            {/* Featured Artists Quick Discovery (Dynamically populated from live catalog) */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
                   Artis Pilihan <ChevronRight className="w-4 h-4 text-neutral-500" />
                 </h2>
+                <span className="text-xs text-neutral-400">Pembaruan Tangga Lagu Global</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  {
-                    name: "Queen",
-                    genre: "Classic Rock",
-                    cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
-                    term: "Queen",
-                  },
-                  {
-                    name: "Taylor Swift",
-                    genre: "Pop",
-                    cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
-                    term: "Taylor Swift",
-                  },
-                  {
-                    name: "The Weeknd",
-                    genre: "R&B / Synthpop",
-                    cover: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
-                    term: "The Weeknd",
-                  },
-                  {
-                    name: "Olivia Rodrigo",
-                    genre: "Alternative Pop",
-                    cover: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80",
-                    term: "Olivia Rodrigo",
-                  },
-                ].map((artist, idx) => (
-                  <div
-                    key={artist.name}
-                    onClick={() => {
-                      setActiveTab("search");
-                      setSearchQuery(artist.term);
-                      executeSearch(artist.term);
-                    }}
-                    className="group relative h-56 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
-                  >
-                    <img
-                      src={artist.cover}
-                      alt={artist.name}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                    <div className="absolute top-3 left-4 text-3xl font-extrabold text-white/90">
-                      {idx + 1}
+                {Array.from(new Map(homeTracks.map((t) => [t.artist, t])).values())
+                  .slice(0, 4)
+                  .map((track, idx) => (
+                    <div
+                      key={track.artist}
+                      onClick={() => {
+                        setActiveTab("search");
+                        setSearchQuery(track.artist);
+                        executeSearch(track.artist);
+                      }}
+                      className="group relative h-56 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-xl cursor-pointer hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                    >
+                      <img
+                        src={track.cover_url}
+                        alt={track.artist}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                      <div className="absolute top-3 left-4 text-3xl font-extrabold text-white/90">
+                        {idx + 1}
+                      </div>
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <div className="text-base font-bold text-white leading-snug truncate">
+                          {track.artist}
+                        </div>
+                        <div className="text-xs text-neutral-300 truncate">
+                          {track.album || "Hits Terpopuler"}
+                        </div>
+                      </div>
                     </div>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <div className="text-base font-bold text-white leading-snug">{artist.name}</div>
-                      <div className="text-xs text-neutral-300">{artist.genre}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
-            {/* Trending Songs Section */}
+            {/* Trending Songs Section (Live Global Chart Feed) */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-                  Lagu Populer Saat Ini <ChevronRight className="w-4 h-4 text-neutral-500" />
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                    Lagu Populer Dunia Saat Ini <ChevronRight className="w-4 h-4 text-neutral-500" />
+                  </h2>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Putar langsung tanpa login. Mendukung audio studio 30s atau lagu penuh via provider.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchTopCharts}
+                  disabled={isLoadingHome}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-neutral-300 transition-colors cursor-pointer"
+                  title="Segarkan Tangga Lagu"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingHome ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">Segarkan</span>
+                </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                {INITIAL_CURATED_TRACKS.map((track, idx) => {
-                  const isCurrent = currentTrack.id === track.id && isPlaying;
-                  return (
-                    <div
-                      key={track.id}
-                      onClick={() => playTrackAt(idx, INITIAL_CURATED_TRACKS)}
-                      className={`group flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer ${
-                        isCurrent
-                          ? "bg-white/15 border border-white/20 shadow-lg"
-                          : "hover:bg-white/5 border border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <span className="w-5 text-center text-sm font-bold text-neutral-400 group-hover:text-white">
-                          {idx + 1}
-                        </span>
-                        <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow">
-                          <img
-                            src={track.cover_url}
-                            alt={track.title}
-                            className="w-full h-full object-cover"
-                          />
-                          {isCurrent && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div
-                            className={`text-sm font-semibold truncate ${
-                              isCurrent ? "text-rose-400" : "text-white"
-                            }`}
-                          >
-                            {track.title}
-                          </div>
-                          <div className="text-xs text-neutral-400 truncate">{track.artist}</div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            playTrackAt(idx, INITIAL_CURATED_TRACKS);
-                          }}
-                          className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white text-white group-hover:text-black flex items-center justify-center transition-colors"
-                        >
-                          <Play className="w-4 h-4 fill-current ml-0.5" />
-                        </button>
-                        <span className="text-xs text-neutral-400 font-mono">
-                          {formatTime(track.duration_secs * 1000)}
-                        </span>
+              {isLoadingHome && homeTracks.length === 0 ? (
+                <div className="py-16 text-center text-neutral-400 text-sm flex flex-col items-center gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-rose-400" />
+                  <span>Memuat lagu-lagu populer dunia...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {homeTracks.map((track, idx) => {
+                    const isCurrent = currentTrack.id === track.id && isPlaying;
+                    return (
+                      <div
+                        key={`${track.id}-${idx}`}
+                        onClick={() => playTrackAt(idx, homeTracks)}
+                        className={`group flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer ${
+                          isCurrent
+                            ? "bg-white/15 border border-white/20 shadow-lg"
+                            : "hover:bg-white/5 border border-transparent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <span className="w-5 text-center text-sm font-bold text-neutral-400 group-hover:text-white">
+                            {idx + 1}
+                          </span>
+                          <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow shrink-0">
+                            <img
+                              src={track.cover_url}
+                              alt={track.title}
+                              className="w-full h-full object-cover"
+                            />
+                            {isCurrent && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div
+                              className={`text-sm font-semibold truncate ${
+                                isCurrent ? "text-rose-400" : "text-white"
+                              }`}
+                            >
+                              {track.title}
+                            </div>
+                            <div className="text-xs text-neutral-400 truncate">{track.artist}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddTrackToPlaylist(track);
+                            }}
+                            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                            title="Tambah ke Playlist"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playTrackAt(idx, homeTracks);
+                            }}
+                            className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white text-white group-hover:text-black flex items-center justify-center transition-colors cursor-pointer"
+                            title="Putar Lagu"
+                          >
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1302,6 +1489,87 @@ export default function App() {
               </div>
             </div>
 
+            {/* Primary Playback Provider Configuration */}
+            <div className="p-5 rounded-2xl bg-neutral-900/40 border border-white/10 space-y-3.5">
+              <div>
+                <div className="text-sm font-bold text-white flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-rose-400" />
+                  Provider Pemutaran Utama
+                </div>
+                <div className="text-xs text-neutral-400 mt-0.5">
+                  Tentukan provider audio untuk memutar lagu secara utuh (Full-Length Audio)
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* TIDAL */}
+                <div
+                  onClick={() => handleSelectPrimaryProvider("Tidal")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    primaryProvider === "Tidal"
+                      ? "bg-white/15 border-white/30 shadow-lg ring-1 ring-white/20"
+                      : "bg-black/40 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-white">TIDAL HiFi</span>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        isTidalConnected
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                          : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      }`}
+                    >
+                      {isTidalConnected ? "Tertaut" : "Belum Tertaut"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Streaming rekaman penuh Master Lossless & Hi-Res audio resmi.
+                  </p>
+                </div>
+
+                {/* Local Files */}
+                <div
+                  onClick={() => handleSelectPrimaryProvider("Local")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    primaryProvider === "Local"
+                      ? "bg-white/15 border-white/30 shadow-lg ring-1 ring-white/20"
+                      : "bg-black/40 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-white">File Lokal</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      Aktif
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Prioritaskan file FLAC / MP3 dari penyimpanan lokal perangkat.
+                  </p>
+                </div>
+
+                {/* Standalone Preview */}
+                <div
+                  onClick={() => handleSelectPrimaryProvider("Preview")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    primaryProvider === "Preview"
+                      ? "bg-white/15 border-white/30 shadow-lg ring-1 ring-white/20"
+                      : "bg-black/40 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-white">Pratinjau Studio</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-500/20 text-neutral-300 border border-neutral-500/30">
+                      Bebas Akun
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Pratinjau 30 detik katalog musik dunia tanpa tautan akun.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Streaming Services */}
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-white">Layanan Musik Terhubung</h2>
@@ -1316,18 +1584,29 @@ export default function App() {
                     <div>
                       <div className="text-sm font-bold text-white">TIDAL HiFi Plus</div>
                       <div className="text-xs text-neutral-400">
-                        {isTidalConnected ? "Terhubung (Hi-Res Lossless)" : "Belum Terhubung"}
+                        {isTidalConnected ? "Terhubung (Hi-Res Lossless Aktif)" : "Belum Terhubung"}
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleStartTidalAuth}
-                    disabled={isConnectingTidal}
-                    className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {isConnectingTidal ? "Menghubungi..." : isTidalConnected ? "Hubungkan Ulang" : "Hubungkan Akun"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {isTidalConnected && (
+                      <button
+                        onClick={handleDisconnectTidal}
+                        className="p-2 rounded-full text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Putuskan Tautan Akun TIDAL"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleStartTidalAuth}
+                      disabled={isConnectingTidal}
+                      className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isConnectingTidal ? "Menghubungi..." : isTidalConnected ? "Hubungkan Ulang" : "Hubungkan Akun"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Verification Code Prompt */}
@@ -1465,9 +1744,25 @@ export default function App() {
                 {currentTrack.artist}
               </div>
             </div>
-            <span className="hidden md:inline-block text-[9px] uppercase font-semibold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-300 shrink-0">
-              {currentTrack.preferred_provider}
-            </span>
+            {primaryProvider === "Tidal" && isTidalConnected ? (
+              <span className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                TIDAL HiFi Penuh
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  setUnlinkedProviderTarget(primaryProvider);
+                  setIsLinkModalOpen(true);
+                }}
+                className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-semibold px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-neutral-300 transition-colors cursor-pointer shrink-0"
+                title="Klik untuk menautkan akun agar lagu diputar penuh"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Preview 30s</span>
+                <span className="text-rose-400 font-bold underline ml-0.5">Tautkan Akun</span>
+              </button>
+            )}
           </div>
 
           {/* Scrubber & Volume & Lyrics */}
@@ -1576,6 +1871,61 @@ export default function App() {
                 className="px-5 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-neutral-200 transition-colors shadow-lg cursor-pointer"
               >
                 Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tautkan Provider (Muncul jika belum set link provider utama) */}
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md p-6 rounded-3xl bg-neutral-900 border border-white/15 shadow-2xl space-y-5">
+            <button
+              onClick={() => setIsLinkModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 border border-rose-500/30 flex items-center justify-center">
+              <Link2 className="w-6 h-6 text-rose-400" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-white tracking-tight">
+                Tautkan Akun {unlinkedProviderTarget}
+              </h3>
+              <p className="text-xs text-neutral-300 leading-relaxed">
+                Anda memilih <strong>{unlinkedProviderTarget}</strong> sebagai provider utama pemutaran. Hubungkan akun Anda untuk mendengarkan lagu secara utuh tanpa batas preview 30 detik.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 text-xs text-neutral-400 flex items-start gap-2.5">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                Jika belum ditautkan, pemutaran lagu otomatis menggunakan <strong>audio pratinjau studio 30 detik</strong> sebagai fallback bawaan.
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+              <button
+                onClick={() => {
+                  setIsLinkModalOpen(false);
+                  setActiveTab("account");
+                  if (unlinkedProviderTarget === "Tidal") {
+                    handleStartTidalAuth();
+                  }
+                }}
+                className="w-full py-2.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer shadow-lg"
+              >
+                Tautkan {unlinkedProviderTarget} Sekarang
+              </button>
+              <button
+                onClick={() => setIsLinkModalOpen(false)}
+                className="w-full py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-neutral-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                Lanjutkan Pratinjau (30s)
               </button>
             </div>
           </div>
