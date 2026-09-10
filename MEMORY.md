@@ -324,6 +324,40 @@ Pengguna memberikan koreksi fundamental bahwa WowMusicPlayer adalah **aplikasi m
 - Perombakan total di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 - Verifikasi: `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
 
+---
+
+## [MEM-013] Sistem Pemutar Musik Mandiri: Live Catalog Beranda (Bebas Login), Setting Provider Utama & Auto-Upgrade TIDAL Full Stream
+- **Waktu Pencatatan**: 2026-09-10 17:25:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Arsitektur / Fitur / Playback Router / UX
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Koreksi Pengguna
+Pengguna menegaskan visi produk: WowMusicPlayer adalah **pemutar musik mandiri (*Independent Music Hub*)**:
+1. Beranda dan Pencarian **TIDAK BOLEH bergantung pada login**; siapa pun yang membuka aplikasi langsung disuguhkan musik dan tangga lagu dunia nyata yang hidup dan bisa langsung didengarkan.
+2. Pemutaran lagu memiliki hierarki cerdas:
+   - Jika belum login atau belum ada service pihak ketiga yang ditautkan (seperti TIDAL), pemutaran audio otomatis menggunakan **fallback audio pratinjau studio 30 detik**.
+   - Jika service (TIDAL) telah terhubung, sistem otomatis mengalirkan **lagu penuh (*Full-Length*)** tanpa batas 30 detik.
+3. Di menu Pengaturan (tab Akun), wajib ada **Settingan Provider Utama** (TIDAL, File Lokal, Mode Pratinjau Standalone).
+4. Jika pengguna memilih provider utama yang belum ditautkan akunnya, wajib muncul **In-App Pop-up / Modal** yang elegan (bukan dialog browser `alert()`) yang memandu pengguna untuk menautkan akun sekarang atau melanjutkan dengan pratinjau 30 detik.
+
+### 2. Solusi & Implementasi Teknis
+- **Live Worldwide Music Hub di Beranda (100% Bebas Login)**:
+  - Mengintegrasikan feed tangga lagu publik dunia teratas (`fetchTopCharts`) saat aplikasi dibuka.
+  - Menampilkan cover resmi berkualitas tinggi (600x600), nama artis, album, dan peringkat lagu dunia.
+  - Memungkinkan 1-klik pemutaran langsung dan 1-klik penambahan ke playlist.
+- **Pengaturan Provider Pemutaran Utama**:
+  - Kartu konfigurasi di tab Akun: pilihan antara `TIDAL HiFi`, `File Audio Lokal`, dan `Mode Standalone Pratinjau`.
+  - Disimpan secara persisten di `localStorage` (`wowmusic_primary_provider`).
+- **Modal Pop-Up Tautkan Provider**:
+  - Modal glassmorphic modern muncul jika pengguna memilih provider yang belum tertaut atau saat lagu diputar dengan provider yang belum ditautkan.
+  - Menyediakan tombol 1-klik untuk langsung memulai otorisasi perangkat atau melanjutkan dengan pratinjau 30s.
+- **Otomasi TIDAL Full-Length Stream Resolver**:
+  - Token otorisasi TIDAL disimpan persisten di `localStorage` (`wowmusic_tidal_token`).
+  - Fungsi `resolveTidalStream` mencocokkan trek ke TIDAL, mengambil manifest streaming resmi (`playbackinfopostpaywall`), mendekode JSON BTS Base64, dan memutar URL stream audio lossless penuh dari CDN TIDAL.
+  - Dock player menampilkan badge interaktif: `[ TIDAL HiFi Penuh ]` atau `[ Preview 30s • Tautkan Akun ]`.
+
+
 
 
 
