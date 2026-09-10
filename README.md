@@ -2,7 +2,7 @@
 
 # 🎵 WowMusicPlayer
 
-**The Ultimate Cross-Platform Hi-Fi Music Player & Universal Playlist Hub**
+**The Ultimate Cross-Platform Music Player & Independent Universal Playlist Hub**
 
 [![Platform](https://img.shields.io/badge/Platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android%20%7C%20iOS-blue)](https://github.com/inimuqsith/WowMusicPlayer)
 [![Tauri](https://img.shields.io/badge/Tauri-v2.0-orange)](https://v2.tauri.app/)
@@ -12,34 +12,34 @@
 English | [Bahasa Indonesia](README_ID.md)
 
 <p align="center">
-  <em>Aggregate your fragmented playlists from Spotify, YouTube Music, and Apple Music into high-resolution TIDAL Lossless playback, enjoy real-time karaoke live lyrics, and seamlessly sync your sessions across devices with a zero-knowledge encrypted cloud vault.</em>
+  <em>Build and own your unified playlists. Seamlessly combine, organize, and play your music from <strong>Spotify, YouTube Music, Apple Music, TIDAL, and Local Files</strong> in one single player — with complete freedom to stream from whatever service you prefer.</em>
 </p>
 
 </div>
 
 ---
 
-## ✨ Key Features
+## ✨ Core Pillars
 
-### 🔄 Universal Playlist Aggregator & Smart Matcher
-- **Consolidate Fragmented Playlists**: Import and unify your favorite playlists from **Spotify, YouTube Music, Apple Music, TIDAL, and Local Files** into unified "Super-Playlists".
-- **Audio Up-Resolution**: Tracks from Spotify/YT Music playlists are intelligently mapped via ISRC codes to the **TIDAL HiFi/Master (FLAC Lossless)** catalog for audiophile-grade fidelity.
-- **Deduplication & Auto-Sync**: Automatically detects duplicate songs across platforms and keeps playlists in sync.
-
-### ☁️ WowCloud & Encrypted Credential Vault
-- **Single Sign-On (SSO)**: One master cloud account to manage and synchronize your entire music world.
-- **Client-Side Zero-Knowledge Encryption**: Third-party streaming credentials (TIDAL tokens, Spotify sessions) are encrypted client-side using **AES-256-GCM + Argon2id** before cloud synchronization. Even the cloud server cannot read your plain-text tokens.
-- **Cross-Device Handoff**: Control desktop or laptop playback remotely from your mobile device, or seamlessly transfer your playback queue.
+### 🗂️ Independent Universal Playlist Engine
+- **Create & Own Your Playlists**: Break free from platform lock-in. Build your own "Super-Playlists" that mix songs from Spotify, YouTube Music, TIDAL, and your local disk into a single cohesive queue.
+- **Import from Any Source**: One-click import via public playlist URLs (Spotify, YouTube Music, Apple Music) or standard file formats (`.m3u`, `.csv`, `.json`).
+- **Provider-Agnostic Freedom**: You choose where each track plays from! Stream natively via Spotify, YouTube Music, TIDAL, or local files depending on your subscriptions and preferences.
 
 ### 🎤 Immersive Live Lyrics Engine
-- **Word-by-Word Real-Time Sync**: Smooth karaoke-style word-by-word glow and line-by-line scrolling powered by **LRCLIB** and **TIDAL Timed Lyrics**.
-- **Desktop Floating Overlay**: Minimal translucent widget floating on top of work windows when minimized.
-- **Click-to-Seek & Instrumental Detection**: Jump to any section of the song by tapping lyric lines, with visual indicators for instrumental breaks.
+- **Real-Time Word-by-Word Sync**: Fluid karaoke glow and synchronized line scrolling powered by **LRCLIB** and multi-source lyrics scrapers.
+- **Desktop Floating Overlay**: Keep your lyrics floating on screen while working in other apps.
+- **Interactive Click-to-Seek**: Tap any lyric line to jump directly to that timestamp in the audio.
 
-### 🎛️ Audiophile-Grade Bit-Perfect Engine
-- **Bit-Perfect Output**: Bypass operating system audio mixers for pristine delivery to external DACs (WASAPI Exclusive, CoreAudio Hog Mode, ALSA Direct).
-- **Comprehensive Format Support**: FLAC, ALAC, WAV, DSD (DSF/DFF), AIFF, MP3, Opus, AAC.
-- **Gapless Playback**: Zero-silence transitions between consecutive tracks with sample-rate auto-switching.
+### ☁️ WowCloud & Zero-Knowledge Session Vault
+- **One Account to Sync Everything**: Sign in once to sync all your unified playlists, song metadata, and playback history across all your devices.
+- **Client-Side Encryption (AES-256-GCM + Argon2id)**: Third-party streaming credentials and sessions are encrypted locally on your device before cloud backup. Zero-knowledge guarantee: even the cloud server cannot read your plain-text tokens.
+- **Cross-Device Handoff**: Control desktop playback from your smartphone or switch audio playback seamlessly.
+
+### 🎛️ High-Performance Native Audio Engine
+- **Rust-Powered Pipeline**: Built on Rust (`cpal` + `symphonia`) for ultra-low latency, clean memory usage, and direct hardware output (WASAPI, CoreAudio, ALSA).
+- **Universal Format Support**: Direct playback of local FLAC, ALAC, WAV, DSD, AIFF, MP3, AAC, and Opus files alongside cloud streams.
+- **Gapless Playback**: Continuous transitions between tracks with no silence gaps.
 
 ---
 
@@ -50,9 +50,11 @@ English | [Bahasa Indonesia](README_ID.md)
 - [Node.js](https://nodejs.org/) (v18+) & `pnpm`
 - Linux System Dependencies (if building on Linux):
   ```bash
-  sudo apt install libasound2-dev libpipewire-0.3-dev libwebkit2gtk-4.1-dev \
-    build-essential curl wget file libssl-dev libgtk-3-dev \
-    libayatana-appindicator3-dev librsvg2-dev
+  # Arch / CachyOS
+  sudo pacman -S --needed webkit2gtk-4.1 base-devel alsa-lib
+  
+  # Ubuntu / Debian
+  sudo apt install libasound2-dev libwebkit2gtk-4.1-dev build-essential
   ```
 
 ### Installation & Development
@@ -71,13 +73,15 @@ pnpm tauri dev
 ---
 
 ## 🗺️ Roadmap
-- [x] Architecture Blueprint & Product Requirements (PRD v0.4.0)
-- [ ] Phase 1: Audio Core Engine & Local Playback
-- [ ] Phase 2: TIDAL HiFi Streaming & Live Lyrics (LRCLIB)
-- [ ] Phase 3: WowCloud Vault & Session Sync (Deployment on `vps-advin`)
-- [ ] Phase 4: Universal Playlist Aggregator (Spotify & YT Music import)
-- [ ] Phase 5: Cross-Device Playback Handoff
-- [ ] Phase 6: Production Multiplatform Release (Desktop & Mobile)
+- [x] Architecture Blueprint & Product Requirements (PRD v0.5.0)
+- [x] Scaffolding Tauri v2 + Rust Core + React 19 UI
+- [x] Client-Side Crypto Vault (AES-256-GCM + Argon2id)
+- [x] Live Lyrics Engine (LRCLIB Client & LRC Parser)
+- [ ] Phase 1: Universal Playlist CRUD & Multi-Platform Ingestion
+- [ ] Phase 2: Multi-Provider Playback Router (Spotify, YouTube Music, TIDAL, Local)
+- [ ] Phase 3: WowCloud Vault & Playlist Sync Deployment (VPS `vps-advin`)
+- [ ] Phase 4: Cross-Device Remote Control & Handoff
+- [ ] Phase 5: Production Multiplatform Releases (Linux, Windows, macOS, Android, iOS)
 
 ---
 

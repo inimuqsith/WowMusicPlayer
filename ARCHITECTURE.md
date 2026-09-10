@@ -1,6 +1,6 @@
 # Arsitektur Sistem WowMusicPlayer
 
-Dokumen ini merinci rancangan teknis dan arsitektur internal **WowMusicPlayer**, mencakup diagram alur data, komponen Rust, sistem enkripsi cloud vault, dan pipeline audio.
+Dokumen ini merinci rancangan teknis dan arsitektur internal **WowMusicPlayer**, mencakup sistem playlist mandiri, router multi-provider, komponen Rust, sistem enkripsi cloud vault, dan pipeline audio.
 
 ---
 
@@ -11,7 +11,7 @@ graph TD
     subgraph UI_Layer [Frontend Layer - React + TypeScript]
         PlayerView[Now Playing & Queue View]
         LyricsComp[Live Lyrics Canvas / Floating Overlay]
-        PlaylistAggView[Universal Playlist Aggregator View]
+        UniversalPlaylistView[Independent Universal Playlist View]
         DeviceHandoffView[Cross-Device Remote Control View]
     end
 
@@ -22,23 +22,23 @@ graph TD
 
     subgraph Core_Rust [Rust Core Services]
         AudioCore[Audio Engine: cpal + symphonia]
-        TidalSvc[TIDAL Client: OAuth PKCE + HiFi Stream]
-        AggregatorSvc[Playlist Aggregator: ISRC & Fuzzy Matcher]
+        PlaybackRouter[Multi-Provider Playback Router: Spotify / YT / TIDAL / Local]
+        AggregatorSvc[Universal Playlist Engine: ISRC & Metadata Matcher]
         VaultSvc[Crypto Engine: Argon2id + AES-GCM-256]
         CloudSyncSvc[WowCloud Realtime Sync Client]
-        LocalDBSvc[SQLite Metadata & Local Track Cache]
+        LocalDBSvc[SQLite Universal Playlists & Local Track Cache]
     end
 
     subgraph External_Cloud [Layanan Cloud & Eksternal]
         WowCloud[WowCloud Backend - Hosted di vps-advin: Auth, Vault DB, Sync]
-        TidalServers[TIDAL Audio & Metadata CDN]
+        MusicProviders[Streaming APIs: Spotify, YouTube Music, TIDAL]
         LRCLIB[LRCLIB Open Lyrics API]
         Hardware[System Audio Output / DAC]
     end
 
     UI_Layer <--> IPC_Bridge <--> Core_Rust
     AudioCore --> Hardware
-    TidalSvc <--> TidalServers
+    PlaybackRouter <--> MusicProviders
     VaultSvc <--> WowCloud
     CloudSyncSvc <--> WowCloud
     AudioCore -. Timestamps .-> LyricsComp
@@ -49,61 +49,38 @@ graph TD
 
 ## 2. Modul-Modul Utama
 
-### 2.1 Audio Pipeline & Bit-Perfect Engine
-- **Audio Output Backend (`cpal`)**:
-  - Menginisialisasi audio device dengan sample rate native dari trek yang sedang diputar.
-  - Mendukung mode **Exclusive** (WASAPI di Windows, ALSA direct di Linux) untuk mencegah intervensi resampler OS.
-- **Audio Demuxing & Decoding (`symphonia`)**:
-  - Mendekode stream FLAC murni, AAC, MP3, dan WAV ke buffer PCM float32/int24 secara real-time.
-- **Clock & Jitter Management**:
-  - Mengirimkan event timestamp dengan presisi tinggi ke UI untuk memandu sinkronisasi lirik kata-demi-kata.
+### 2.1 Independent Universal Playlist Engine
+- **Universal Track Metadata Schema**:
+  - Setiap trek memiliki identifier unik dan referensi multi-provider:
+    ```json
+    {
+      "id": "trk_0182",
+      "title": "Starboy",
+      "artist": "The Weeknd, Daft Punk",
+      "album": "Starboy",
+      "duration_secs": 230,
+      "isrc": "USUM71607007",
+      "available_providers": ["Spotify", "YouTubeMusic", "Tidal", "Local"],
+      "preferred_provider": "Auto"
+    }
+    ```
+- **Penyatuan Playlist Lintas Layanan**:
+  - Pengguna dapat membuat "Super-Playlist" yang mencampur lagu dari berbagai sumber tanpa memedulikan batas antar-aplikasi.
+  - Mendukung impor dari link publik Spotify, YouTube Music, dan Apple Music.
 
-### 2.2 WowCloud Vault & Client-Side Encryption
-Untuk menjaga privasi dan keamanan tingkat tinggi:
-1. Pengguna memasukkan Master Password / Biometrik saat login ke akun WowMusic.
-2. Kunci enkripsi klien di-generate menggunakan **Argon2id** dari password pengguna.
-3. Kredensial sensitif (TIDAL refresh token, Spotify session) dienkripsi secara lokal dengan **AES-256-GCM** sebelum disinkronkan ke server cloud di `vps-advin`.
-4. Server cloud hanya menyimpan ciphertext terenkripsi (Zero-Knowledge Architecture).
+### 2.2 Multi-Provider Playback Router
+- Pengguna bebas memilih ingin memutar lagu melalui **Spotify**, **YouTube Music**, **TIDAL**, atau **File Lokal**.
+- Jika provider utama sedang offline atau tidak memiliki lagu tertentu, router secara otomatis mengalihkan aliran pemutaran ke provider alternatif (*smart fallback*).
 
-### 2.3 Universal Playlist Aggregator & ISRC Matcher
-- Alur Ingestion:
-  1. Pengguna memasukkan link playlist (Spotify, YouTube Music, atau Apple Music).
-  2. Modul pengurai mengambil daftar judul lagu, artis, durasi, dan ISRC.
-  3. Mesin pencari querying ke katalog TIDAL Open API menggunakan ISRC sebagai kunci utama.
-  4. Jika ISRC tidak tersedia, algoritma *Levenshtein Distance fuzzy matching* mencocokkan Nama Lagu + Nama Artis dengan toleransi durasi ±3 detik.
-  5. Hasil disimpan ke SQLite lokal dan dicadangkan ke akun cloud pengguna.
+### 2.3 Audio Pipeline Native Rust
+- Menggunakan `cpal` dan `symphonia` untuk decoding dan buffering audio PCM berkualitas tinggi.
+- Output murni ke DAC eksternal via mode eksklusif (WASAPI Exclusive, CoreAudio, ALSA).
+- Gapless playback antar-lagu.
 
-### 2.4 Live Lyrics Engine
-- Multi-tier fallback:
-  - Level 1: Mengambil lirik berlisensi dari TIDAL API (`/tracks/{id}/lyrics`).
-  - Level 2: Mengambil lirik dari API terbuka **LRCLIB** menggunakan parameter `track_name`, `artist_name`, `album_name`, dan `duration`.
-  - Level 3: Membaca file `.lrc` lokal di samping file audio.
-- Format lirik parsed menjadi objek linier dengan timestamp milidetik untuk rendering 60 FPS pada UI Canvas.
+### 2.4 WowCloud Vault & Client-Side Encryption
+- Sesi dan token ketiga pihak (Spotify OAuth, TIDAL token, sesi YouTube) dienkripsi lokal dengan **AES-256-GCM + Argon2id** sebelum disinkronkan ke server backend di `vps-advin`.
+- Zero-knowledge: server cloud tidak dapat membaca kredensial pengguna dalam bentuk plain-text.
 
----
-
-## 3. Struktur Direktori Proyek yang Direncanakan
-```text
-WowMusicPlayer/
-├── AGENTS.md                  # Panduan AI Agent
-├── README.md                  # Dokumentasi publik proyek
-├── ARCHITECTURE.md            # Cetak biru arsitektur teknis
-├── SECURITY.md                # Kebijakan keamanan & enkripsi
-├── PRD.md                     # Product Requirement Document
-├── src-tauri/                 # Backend Rust (Tauri Core)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs
-│       ├── audio/             # cpal & symphonia engine
-│       ├── tidal/             # TIDAL SDK & OAuth PKCE
-│       ├── aggregator/        # ISRC fuzzy playlist matcher
-│       ├── vault/             # AES-256-GCM & Argon2id crypto
-│       ├── lyrics/            # LRCLIB & lyrics parser
-│       └── sync/              # Cloud sync & device handoff
-├── src/                       # Frontend (React + TypeScript)
-│   ├── components/            # Player, Lyrics, Playlist, CloudSettings
-│   ├── hooks/                 # Tauri IPC bindings
-│   ├── stores/                # Zustand state stores
-│   └── App.tsx
-└── package.json
-```
+### 2.5 Live Lyrics Engine
+- Bertenaga **LRCLIB Open API** untuk lirik real-time kata-demi-kata bergaya karaoke.
+- Dukungan *desktop floating overlay* dan *click-to-seek*.

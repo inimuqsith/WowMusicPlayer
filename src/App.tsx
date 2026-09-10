@@ -40,9 +40,9 @@ interface UnifiedTrackItem {
   album: string;
   duration_secs: number;
   isrc?: string;
-  source: "Spotify" | "YouTubeMusic" | "AppleMusic" | "Tidal" | "Local";
+  original_source: "Spotify" | "YouTubeMusic" | "AppleMusic" | "Tidal" | "Local";
+  preferred_provider: "Spotify" | "YouTubeMusic" | "Tidal" | "Local";
   cover_url: string;
-  match_confidence: "ExactIsrcHiFi" | "FuzzyMetadataMatched" | "AlternativeVersion" | "FallbackSource";
   audio_quality: string;
 }
 
@@ -54,10 +54,10 @@ const SAMPLE_SUPER_PLAYLIST: UnifiedTrackItem[] = [
     album: "A Night at the Opera",
     duration_secs: 354,
     isrc: "GBUM71029604",
-    source: "Spotify",
+    original_source: "Spotify",
+    preferred_provider: "Spotify",
     cover_url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80",
-    match_confidence: "ExactIsrcHiFi",
-    audio_quality: "TIDAL Hi-Res FLAC 24-bit / 96 kHz",
+    audio_quality: "Spotify Premium (320 kbps)",
   },
   {
     id: "yt-2",
@@ -66,10 +66,10 @@ const SAMPLE_SUPER_PLAYLIST: UnifiedTrackItem[] = [
     album: "Starboy",
     duration_secs: 230,
     isrc: "USUM71607007",
-    source: "YouTubeMusic",
+    original_source: "YouTubeMusic",
+    preferred_provider: "YouTubeMusic",
     cover_url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80",
-    match_confidence: "ExactIsrcHiFi",
-    audio_quality: "TIDAL HiFi FLAC 16-bit / 44.1 kHz",
+    audio_quality: "YouTube Audio (Opus 160 kbps)",
   },
   {
     id: "am-3",
@@ -78,10 +78,10 @@ const SAMPLE_SUPER_PLAYLIST: UnifiedTrackItem[] = [
     album: "After Hours",
     duration_secs: 200,
     isrc: "USUG11904206",
-    source: "AppleMusic",
+    original_source: "AppleMusic",
+    preferred_provider: "Tidal",
     cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
-    match_confidence: "FuzzyMetadataMatched",
-    audio_quality: "TIDAL Hi-Res FLAC 24-bit / 48 kHz",
+    audio_quality: "TIDAL HiFi (Lossless FLAC)",
   },
   {
     id: "loc-4",
@@ -90,10 +90,10 @@ const SAMPLE_SUPER_PLAYLIST: UnifiedTrackItem[] = [
     album: "Hell Freezes Over",
     duration_secs: 432,
     isrc: "USEE19400001",
-    source: "Local",
+    original_source: "Local",
+    preferred_provider: "Local",
     cover_url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&auto=format&fit=crop&q=80",
-    match_confidence: "ExactIsrcHiFi",
-    audio_quality: "Local DSD 5.6 MHz (DSD128)",
+    audio_quality: "Local Storage (FLAC 24-bit / 96 kHz)",
   },
 ];
 
@@ -267,6 +267,14 @@ export default function App() {
     if (!playlistUrlInput.trim()) return;
     setIsImporting(true);
     setTimeout(() => {
+      const src = playlistUrlInput.includes("youtube")
+        ? "YouTubeMusic"
+        : playlistUrlInput.includes("apple")
+        ? "AppleMusic"
+        : playlistUrlInput.includes("tidal")
+        ? "Tidal"
+        : "Spotify";
+
       const newImported: UnifiedTrackItem = {
         id: `agg-${Date.now()}`,
         title: "Levitating",
@@ -274,15 +282,15 @@ export default function App() {
         album: "Future Nostalgia",
         duration_secs: 203,
         isrc: "GBAYE2000632",
-        source: playlistUrlInput.includes("youtube") ? "YouTubeMusic" : "Spotify",
+        original_source: src,
+        preferred_provider: src === "AppleMusic" ? "Spotify" : (src as any),
         cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
-        match_confidence: "ExactIsrcHiFi",
-        audio_quality: "TIDAL Master MQA / Hi-Res FLAC 24-bit / 96 kHz",
+        audio_quality: "High Fidelity Stream",
       };
       setTracks((prev) => [newImported, ...prev]);
       setPlaylistUrlInput("");
       setIsImporting(false);
-    }, 800);
+    }, 600);
   };
 
   const handleTestVaultEncrypt = async () => {
@@ -443,13 +451,11 @@ export default function App() {
                   {currentTrack.artist}
                 </p>
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-xs text-zinc-500 bg-zinc-800/60 px-2.5 py-1 rounded-full border border-zinc-700/50">
-                    Source: {currentTrack.source}
+                  <span className="text-xs text-zinc-400 bg-zinc-800/60 px-2.5 py-1 rounded-full border border-zinc-700/50">
+                    Origin: {currentTrack.original_source}
                   </span>
-                  <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
-                    {currentTrack.match_confidence === "ExactIsrcHiFi"
-                      ? "✓ TIDAL HiFi Master (Lossless)"
-                      : "✓ Matched Lossless"}
+                  <span className="text-xs text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/30 font-medium">
+                    Playing via: {currentTrack.preferred_provider}
                   </span>
                 </div>
               </div>
@@ -536,8 +542,8 @@ export default function App() {
                     <th className="px-6 py-4"># Track</th>
                     <th className="px-6 py-4">Artist & Album</th>
                     <th className="px-6 py-4">Original Source</th>
-                    <th className="px-6 py-4">ISRC Code</th>
-                    <th className="px-6 py-4">Audio Up-Resolution (TIDAL)</th>
+                    <th className="px-6 py-4">Playback Provider (User Choice)</th>
+                    <th className="px-6 py-4">Quality Info</th>
                     <th className="px-6 py-4 text-right">Durasi</th>
                   </tr>
                 </thead>
@@ -568,11 +574,27 @@ export default function App() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
-                          {t.source}
+                          {t.original_source}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-mono text-xs text-zinc-400">
-                        {t.isrc || "—"}
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={t.preferred_provider}
+                          onChange={(e) => {
+                            const newProvider = e.target.value as any;
+                            setTracks((prev) =>
+                              prev.map((item, i) =>
+                                i === idx ? { ...item, preferred_provider: newProvider } : item
+                              )
+                            );
+                          }}
+                          className="bg-zinc-900 border border-zinc-700 text-cyan-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 cursor-pointer font-medium"
+                        >
+                          <option value="Spotify">Stream: Spotify</option>
+                          <option value="YouTubeMusic">Stream: YouTube Music</option>
+                          <option value="Tidal">Stream: TIDAL HiFi</option>
+                          <option value="Local">Local Storage</option>
+                        </select>
                       </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">

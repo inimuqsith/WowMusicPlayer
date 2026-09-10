@@ -2,7 +2,7 @@
 
 # 🎵 WowMusicPlayer
 
-**The Ultimate Cross-Platform Hi-Fi Music Player & Universal Playlist Hub**
+**The Ultimate Cross-Platform Music Player & Independent Universal Playlist Hub**
 
 [![Platform](https://img.shields.io/badge/Platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android%20%7C%20iOS-blue)](https://github.com/inimuqsith/WowMusicPlayer)
 [![Tauri](https://img.shields.io/badge/Tauri-v2.0-orange)](https://v2.tauri.app/)
@@ -12,34 +12,34 @@
 [English](README.md) | Bahasa Indonesia
 
 <p align="center">
-  <em>Satukan seluruh playlist Anda dari Spotify, YouTube Music, dan Apple Music ke dalam pemutaran Hi-Res Lossless TIDAL, nikmati lirik karaoke live, dan sinkronkan sesi Anda di semua perangkat dengan brankas cloud terenkripsi zero-knowledge.</em>
+  <em>Bangun dan miliki sistem playlist Anda sendiri. Satukan, atur, dan putar musik dari <strong>Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal</strong> dalam satu aplikasi — dengan kebebasan penuh memilih layanan streaming yang Anda inginkan.</em>
 </p>
 
 </div>
 
 ---
 
-## ✨ Fitur Unggulan
+## ✨ Pilar Utama Aplikasi
 
-### 🔄 Universal Playlist Aggregator & Smart Matcher
-- **Merekap Playlist Tercecer**: Impor dan satukan playlist favorit Anda dari **Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal** ke dalam satu perpustakaan terpadu (*Super-Playlists*).
-- **Audio Up-Resolution**: Lagu-lagu dari playlist Spotify/YT Music secara cerdas dicocokkan via kode ISRC ke katalog **TIDAL HiFi/Master (FLAC Lossless)** untuk kenikmatan audio resolusi tinggi.
-- **Deduplikasi Otomatis**: Mendeteksi dan menghapus lagu duplikat lintas platform secara cerdas.
-
-### ☁️ WowCloud & Encrypted Credential Vault
-- **Satu Akun untuk Semua**: Cukup login sekali dengan akun master WowCloud Anda.
-- **Enkripsi Zero-Knowledge Sisi-Klien**: Token TIDAL dan sesi streaming terenkripsi secara *client-side* (**AES-256-GCM + Argon2id**) sebelum disinkronkan ke cloud. Server backend pun tidak dapat membaca token teks biasa Anda.
-- **Cross-Device Handoff**: Kendalikan pemutaran di PC/laptop Anda langsung dari smartphone Anda (mirip Spotify Connect).
+### 🗂️ Sistem Playlist Mandiri (Independent Universal Playlist Engine)
+- **Miliki Playlist Anda Sendiri**: Bebas dari keterikatan satu platform (*vendor lock-in*). Buat "Super-Playlist" kustom yang menggabungkan lagu dari Spotify, YouTube Music, TIDAL, dan penyimpanan lokal ke dalam satu antrean utuh.
+- **Impor dari Mana Saja**: Cukup tempel link URL publik playlist (Spotify, YouTube Music, Apple Music) atau impor format standar (`.m3u`, `.csv`, `.json`).
+- **Bebas Memilih Provider Pemutaran**: Pengguna bebas menentukan sumber pemutaran tiap lagu! Putar langsung via Spotify, YouTube Music, TIDAL, atau file lokal sesuai akun dan preferensi yang Anda miliki.
 
 ### 🎤 Immersive Live Lyrics Engine
-- **Sinkronisasi Real-Time**: Lirik bergulir halus kata-demi-kata (*karaoke glow*) dan baris-demi-baris bertenaga **LRCLIB** dan **TIDAL Timed Lyrics**.
-- **Desktop Floating Overlay**: Lirik melayang transparan di atas layar kerja Anda saat aplikasi diminimalkan.
-- **Click-to-Seek**: Lompat ke bagian lagu favorit cukup dengan mengklik baris lirik.
+- **Lirik Real-Time Kata-demi-Kata**: Tampilan karaoke dinamis dengan efek *glow* kata-demi-kata dan gulir otomatis baris-demi-baris bertenaga **LRCLIB** serta parser lirik multi-sumber.
+- **Desktop Floating Overlay**: Jendela lirik mini transparan yang melayang di layar saat aplikasi diminimalkan.
+- **Click-to-Seek**: Ketuk baris lirik mana saja untuk langsung melompatkan posisi lagu ke detik tersebut.
 
-### 🎛️ Audiophile-Grade Bit-Perfect Engine
-- **Bit-Perfect Output**: Bypass mixer OS untuk audio murni ke DAC eksternal (WASAPI Exclusive, CoreAudio Hog Mode, ALSA Direct).
-- **Dukungan Format Lengkap**: FLAC, ALAC, WAV, DSD (DSF/DFF), AIFF, MP3, Opus, AAC.
-- **Gapless Playback**: Transisi antar lagu tanpa jeda sunyi (*zero silence gap*) dengan auto-switching sample rate.
+### ☁️ WowCloud & Brankas Sesi Terenkripsi Zero-Knowledge
+- **Satu Akun untuk Semua**: Cukup login sekali untuk menyinkronkan seluruh playlist gabungan, metadata lagu, dan riwayat pemutaran di semua perangkat Anda.
+- **Enkripsi Sisi-Klien (AES-256-GCM + Argon2id)**: Kredensial dan sesi streaming pihak ketiga dienkripsi secara lokal di perangkat sebelum dicadangkan ke cloud. Server cloud tidak dapat membaca token teks biasa Anda.
+- **Cross-Device Handoff**: Kendalikan pemutaran di PC langsung dari smartphone Anda, atau transfer antrean lagu antar-perangkat.
+
+### 🎛️ Engine Audio Native Berperforma Tinggi
+- **Arsitektur Rust**: Ditenagai Rust (`cpal` + `symphonia`) untuk latensi ultra-rendah, konsumsi memori minim, dan routing hardware murni (WASAPI, CoreAudio, ALSA).
+- **Format File Lengkap**: Pemutaran langsung file lokal FLAC, ALAC, WAV, DSD, AIFF, MP3, AAC, dan Opus berdampingan dengan musik cloud.
+- **Gapless Playback**: Transisi halus antar lagu tanpa jeda sunyi.
 
 ---
 
@@ -48,11 +48,13 @@
 ### Prasyarat
 - [Rust](https://rustup.rs/) (versi stabil terbaru)
 - [Node.js](https://nodejs.org/) (v18+) & `pnpm`
-- Dependencies sistem Linux (jika di Linux):
+- Dependencies sistem Linux:
   ```bash
-  sudo apt install libasound2-dev libpipewire-0.3-dev libwebkit2gtk-4.1-dev \
-    build-essential curl wget file libssl-dev libgtk-3-dev \
-    libayatana-appindicator3-dev librsvg2-dev
+  # Arch / CachyOS
+  sudo pacman -S --needed webkit2gtk-4.1 base-devel alsa-lib
+  
+  # Ubuntu / Debian
+  sudo apt install libasound2-dev libwebkit2gtk-4.1-dev build-essential
   ```
 
 ### Instalasi & Menjalankan Mode Pengembangan
@@ -71,13 +73,15 @@ pnpm tauri dev
 ---
 
 ## 🗺️ Roadmap Singkat
-- [x] Perancangan Arsitektur & Spesifikasi Produk (PRD v0.4.0)
-- [ ] Fase 1: Audio Engine Dasar & Pemutar Lokal
-- [ ] Fase 2: Integrasi TIDAL HiFi & Live Lyrics (LRCLIB)
-- [ ] Fase 3: WowCloud Vault & Sinkronisasi Sesi Kredensial (Deploy di `vps-advin`)
-- [ ] Fase 4: Universal Playlist Aggregator (Spotify & YT Music import)
-- [ ] Fase 5: Cross-Device Handoff (Remote Playback Control)
-- [ ] Fase 6: Rilis Cross-Platform Resmi (Desktop & Mobile)
+- [x] Perancangan Arsitektur & Spesifikasi Produk (PRD v0.5.0)
+- [x] Scaffolding Tauri v2 + Rust Core + React 19 UI
+- [x] Client-Side Crypto Vault (AES-256-GCM + Argon2id)
+- [x] Live Lyrics Engine (LRCLIB Client & LRC Parser)
+- [ ] Fase 1: CRUD Sistem Playlist Mandiri & Import Multi-Platform
+- [ ] Fase 2: Router Pemutaran Multi-Provider (Spotify, YouTube Music, TIDAL, Lokal)
+- [ ] Fase 3: Deployment WowCloud Vault & Sinkronisasi Playlist (VPS `vps-advin`)
+- [ ] Fase 4: Cross-Device Remote Control & Handoff
+- [ ] Fase 5: Rilis Resmi Multiplatform (Linux, Windows, macOS, Android, iOS)
 
 ---
 
