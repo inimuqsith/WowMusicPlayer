@@ -2,8 +2,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// Standard TIDAL Client ID for TV / Desktop devices (Configurable via env)
-const DEFAULT_CLIENT_ID: &str = "zU4XHVVkc2tDPo4t";
+// Standard working TIDAL Client ID & Secret for Device Auth flow
+const DEFAULT_CLIENT_ID: &str = "fX2JxdmntZWK0ixT";
+const DEFAULT_CLIENT_SECRET: &str = "1Nn9AfDAjxrgJFJbKNWLeAyKGVGmINuXPPLHVXAvxAg=";
 const AUTH_BASE_URL: &str = "https://auth.tidal.com/v1/oauth2";
 const API_BASE_URL: &str = "https://api.tidal.com/v1";
 
@@ -48,6 +49,7 @@ pub struct TidalPlaybackInfo {
 pub struct TidalClient {
     client: Client,
     client_id: String,
+    client_secret: String,
 }
 
 impl Default for TidalClient {
@@ -59,22 +61,25 @@ impl Default for TidalClient {
 impl TidalClient {
     pub fn new() -> Self {
         let client_id = std::env::var("TIDAL_CLIENT_ID").unwrap_or_else(|_| DEFAULT_CLIENT_ID.to_string());
+        let client_secret = std::env::var("TIDAL_CLIENT_SECRET").unwrap_or_else(|_| DEFAULT_CLIENT_SECRET.to_string());
         Self {
             client: Client::builder()
-                .user_agent("WowMusicPlayer/0.2.0 (Linux; x86_64)")
+                .user_agent("WowMusicPlayer/0.4.0 (Linux; x86_64)")
                 .build()
                 .unwrap_or_default(),
             client_id,
+            client_secret,
         }
     }
 
-    pub fn with_client_id(client_id: String) -> Self {
+    pub fn with_credentials(client_id: String, client_secret: String) -> Self {
         Self {
             client: Client::builder()
-                .user_agent("WowMusicPlayer/0.2.0 (Linux; x86_64)")
+                .user_agent("WowMusicPlayer/0.4.0 (Linux; x86_64)")
                 .build()
                 .unwrap_or_default(),
             client_id,
+            client_secret,
         }
     }
 
@@ -82,9 +87,9 @@ impl TidalClient {
     pub async fn start_device_auth(&self) -> Result<DeviceAuthResponse, String> {
         let mut params = HashMap::new();
         params.insert("client_id", self.client_id.as_str());
-        params.insert("scope", "r_usr w_usr");
+        params.insert("scope", "r_usr w_usr w_sub");
 
-        let url = format!("{}/device/authorization", AUTH_BASE_URL);
+        let url = format!("{}/device_authorization", AUTH_BASE_URL);
         let resp = self
             .client
             .post(&url)
@@ -121,17 +126,18 @@ impl TidalClient {
             verification_uri: raw.verification_uri,
             verification_uri_complete: raw.verification_uri_complete,
             expires_in: raw.expires_in,
-            interval: raw.interval.unwrap_or(5),
+            interval: raw.interval.unwrap_or(2),
         })
     }
 
     /// Step 2: Poll for user approval of the device code
-    pub async fn poll_device_token(&self, device_code: &str) -> Result<TidalToken, String> {
+    pub async fn poll_device_token(&self, device_code: &str) -> Result<Option<TidalToken>, String> {
         let mut params = HashMap::new();
         params.insert("client_id", self.client_id.as_str());
+        params.insert("client_secret", self.client_secret.as_str());
         params.insert("device_code", device_code);
         params.insert("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
-        params.insert("scope", "r_usr w_usr");
+        params.insert("scope", "r_usr w_usr w_sub");
 
         let url = format!("{}/token", AUTH_BASE_URL);
         let resp = self
@@ -145,7 +151,13 @@ impl TidalClient {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(format!("Waiting for user authorization: (Status {}) {}", status, text));
+            if text.contains("authorization_pending") {
+                return Ok(None);
+            }
+            if text.contains("expired_token") {
+                return Err("Kode otorisasi TIDAL telah kadaluarsa. Silakan mulai ulang.".to_string());
+            }
+            return Err(format!("Menunggu otorisasi TIDAL (Status {}): {}", status, text));
         }
 
         #[derive(Deserialize)]
@@ -162,13 +174,13 @@ impl TidalClient {
             .await
             .map_err(|e| format!("Failed to parse token response: {}", e))?;
 
-        Ok(TidalToken {
+        Ok(Some(TidalToken {
             access_token: raw.access_token,
             refresh_token: raw.refresh_token,
             token_type: raw.token_type,
             expires_in: raw.expires_in,
             user_id: raw.user_id,
-        })
+        }))
     }
 
     /// Step 3: Search for a track in the TIDAL catalog by metadata/query
@@ -301,7 +313,7 @@ mod tests {
         let client = TidalClient::new();
         assert_eq!(client.client_id, DEFAULT_CLIENT_ID);
 
-        let custom_client = TidalClient::with_client_id("custom_id_123".to_string());
+        let custom_client = TidalClient::with_credentials("custom_id_123".to_string(), "custom_sec".to_string());
         assert_eq!(custom_client.client_id, "custom_id_123");
     }
 

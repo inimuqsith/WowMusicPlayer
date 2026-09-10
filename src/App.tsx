@@ -511,36 +511,81 @@ export default function App() {
     }
   };
 
-  // TIDAL Connection Handler
+  const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+
+  // TIDAL Connection Handler with Automatic Live Polling
   const handleStartTidalAuth = async () => {
     setIsConnectingTidal(true);
     setTidalAuthCode(null);
+    if (pollIntervalId) {
+      clearInterval(pollIntervalId);
+      setPollIntervalId(null);
+    }
+
     try {
       const res = await invoke<{
         device_code: string;
         user_code: string;
         verification_uri: string;
+        verification_uri_complete?: string;
         expires_in: number;
         interval: number;
       }>("tidal_start_device_auth");
 
+      const linkUrl = res.verification_uri_complete
+        ? `https://${res.verification_uri_complete}`
+        : `https://${res.verification_uri}`;
+
       setTidalAuthCode(res.user_code);
-      setTidalVerificationUri(res.verification_uri);
-      showToast("Kode pairing TIDAL berhasil diperoleh! Buka link verifikasi.", "success", "TIDAL Auth");
+      setTidalVerificationUri(linkUrl);
+      showToast(
+        `Kode TIDAL: ${res.user_code}. Buka ${res.verification_uri} untuk konfirmasi.`,
+        "info",
+        "TIDAL Pairing Aktif"
+      );
+
+      // Auto-poll TIDAL auth endpoint in background
+      const intervalSecs = Math.max(res.interval || 2, 2);
+      const timer = setInterval(async () => {
+        try {
+          const token = await invoke<{
+            access_token: string;
+            user_id?: number;
+          } | null>("tidal_poll_device_token", { deviceCode: res.device_code });
+
+          if (token) {
+            clearInterval(timer);
+            setPollIntervalId(null);
+            setIsTidalConnected(true);
+            setTidalAuthCode(null);
+            showToast(
+              "Akun TIDAL HiFi berhasil terhubung! Kualitas Hi-Res Lossless FLAC aktif.",
+              "success",
+              "TIDAL Terhubung"
+            );
+          }
+        } catch (err: any) {
+          clearInterval(timer);
+          setPollIntervalId(null);
+          showToast(`Sesi pairing TIDAL berakhir: ${err}`, "warning");
+        }
+      }, intervalSecs * 1000);
+
+      setPollIntervalId(timer);
     } catch (err: any) {
-      const errStr = String(err);
-      if (errStr.includes("403") || errStr.includes("1005")) {
-        showToast(
-          "Client ID bawaan TIDAL dibatasi oleh auth server TIDAL. Anda dapat memasukkan Client ID / Token pribadi di bawah.",
-          "warning",
-          "TIDAL Auth Terbatas"
-        );
-      } else {
-        showToast(`Koneksi TIDAL: ${errStr}`, "error", "Gagal Menghubungi TIDAL");
-      }
+      showToast(`Gagal memulai auth TIDAL: ${err}`, "error", "Gagal Menghubungi TIDAL");
     } finally {
       setIsConnectingTidal(false);
     }
+  };
+
+  const handleCancelTidalAuth = () => {
+    if (pollIntervalId) {
+      clearInterval(pollIntervalId);
+      setPollIntervalId(null);
+    }
+    setTidalAuthCode(null);
+    showToast("Pairing TIDAL dibatalkan", "info");
   };
 
   const formatTime = (ms: number) => {
@@ -1125,25 +1170,50 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Verification Code Prompt */}
+                {/* Verification Code Prompt (Apple Music Dark Glassmorphic Card) */}
                 {tidalAuthCode && (
-                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/20 text-xs space-y-2">
-                    <div className="font-semibold text-rose-300">
-                      Buka link verifikasi TIDAL di browser Anda:
-                    </div>
-                    <div className="font-mono text-base font-bold text-white tracking-widest bg-black/50 p-2 rounded-lg text-center">
-                      {tidalAuthCode}
-                    </div>
-                    {tidalVerificationUri && (
-                      <a
-                        href={tidalVerificationUri}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-rose-400 hover:underline"
+                  <div className="p-5 rounded-2xl bg-neutral-950/80 border border-rose-500/30 text-xs space-y-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-rose-400 font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                        Menunggu Otorisasi di Browser...
+                      </div>
+                      <button
+                        onClick={handleCancelTidalAuth}
+                        className="text-neutral-400 hover:text-white transition-colors cursor-pointer text-[11px]"
                       >
-                        Buka {tidalVerificationUri} <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
+                        Batal
+                      </button>
+                    </div>
+
+                    <div className="text-center py-2 bg-black/60 rounded-xl border border-white/10">
+                      <div className="text-[11px] text-neutral-400 mb-1">KODE VERIFIKASI PENGGUNA</div>
+                      <div className="font-mono text-3xl font-extrabold text-white tracking-[0.3em] select-all">
+                        {tidalAuthCode}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {tidalVerificationUri && (
+                        <a
+                          href={tidalVerificationUri}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors shadow-lg"
+                        >
+                          Buka link.tidal.com di Browser <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(tidalAuthCode);
+                          showToast("Kode berhasil disalin ke clipboard", "success");
+                        }}
+                        className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-medium text-xs transition-colors cursor-pointer"
+                      >
+                        Salin Kode
+                      </button>
+                    </div>
                   </div>
                 )}
 

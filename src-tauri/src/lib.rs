@@ -175,7 +175,7 @@ async fn tidal_start_device_auth(state: State<'_, AppState>) -> Result<DeviceAut
 async fn tidal_poll_device_token(
     state: State<'_, AppState>,
     device_code: String,
-) -> Result<TidalToken, String> {
+) -> Result<Option<TidalToken>, String> {
     state.tidal.poll_device_token(&device_code).await
 }
 

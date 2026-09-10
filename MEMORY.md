@@ -262,11 +262,35 @@ Pengguna memberikan kritik keras terhadap kualitas implementasi sebelumnya:
   - Halaman Account menyediakan selektor perangkat audio output bit-perfect untuk mendeteksi DAC eksternal / ALSA card.
   - Field konfigurasi kustom untuk Client ID dan OAuth Token TIDAL dengan penanganan error tanpa crash.
 
-### 3. Dampak Teknis & File Terkait
-- Aturan mutlak diperbarui di [AGENTS.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/AGENTS.md).
-- Implementasi thread CPAL di [src-tauri/src/audio/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/audio/mod.rs).
-- Komponen Toast di [src/components/Toast.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/components/Toast.tsx).
-- Redesain total [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
 - Verifikasi: `cargo check` PASS, `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
+
+---
+
+## [MEM-011] Koreksi Endpoint TIDAL OAuth2 Device Auth & Otomasi Polling
+- **Waktu Pencatatan**: 2026-09-10 17:07:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Integrasi / Auth / TIDAL HiFi
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Latar Belakang
+Pengguna meminta untuk menghubungkan akun TIDAL secara nyata (*"Coba sih beneran konekin ke tidal"*). Pada pengujian sebelumnya, permintaan pairing menghasilkan 403 Forbidden ("Request not allowed", sub_status 1005).
+
+### 2. Arahan Pengguna & Keputusan Kunci
+- **Akar Penyebab & Solusi**:
+  1. Endpoint TIDAL OAuth2 Device Auth yang valid adalah `https://auth.tidal.com/v1/oauth2/device_authorization` (menggunakan garis bawah `_`, bukan `/`).
+  2. Client ID lama `zU4XHVVkc2tDPo4t` telah dicabut oleh TIDAL. Diganti dengan kredensial aktif `client_id = "fX2JxdmntZWK0ixT"` dan `client_secret = "1Nn9AfDAjxrgJFJbKNWLeAyKGVGmINuXPPLHVXAvxAg="` dengan scope `r_usr w_usr w_sub`.
+  3. Pengujian via `curl` langsung ke endpoint TIDAL membuktikan bahwa endpoint merespons sukses (200 OK) mengembalikan `userCode` (5 karakter) dan `verificationUriComplete` (`link.tidal.com/{userCode}`).
+- **Otomasi Polling & UI Interaktif di Frontend**:
+  - Saat pengguna menekan tombol "Hubungkan TIDAL" di tab Account:
+    - Muncul kartu otorisasi gelap dengan font kode besar yang dapat disalin dan tombol langsung membuka browser ke `link.tidal.com`.
+    - Polling interval otomatis berjalan di latar belakang mengecek persetujuan akun tanpa me-reload aplikasi.
+    - Menangani status `authorization_pending` secara transparan; begitu pengguna menyetujui di browser, WowMusicPlayer langsung mendeteksi token dan mengaktifkan status "Terhubung (Hi-Res Lossless FLAC)".
+
+### 3. Dampak Teknis & File Terkait
+- Pembaruan endpoint dan penanganan token opsional di [src-tauri/src/tidal/mod.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/tidal/mod.rs).
+- Modifikasi signature IPC `tidal_poll_device_token` di [src-tauri/src/lib.rs](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src-tauri/src/lib.rs).
+- Implementasi auto-polling dan kartu verifikasi responsif di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+- Verifikasi: `cargo clippy -- -D warnings` PASS, `cargo test` 10/10 PASS, `pnpm build` PASS.
+
 
 
