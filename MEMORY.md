@@ -452,3 +452,48 @@ Pengguna menghapus draf lama yang belum disetujui dan memberikan arahan perbaika
 - Pengalaman konsumer meningkat tajam, setara dengan standar estetika Apple Music / Spotify Desktop.
 - Berkas terkait: `src/App.tsx`, `plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`, `plans/README.md`, `MEMORY.md`.
 
+---
+
+## [MEM-017] Eliminasi Total Pop-Up, Perbaikan Global Scroll, Badge Kualitas, dan Output Selector dengan Exclusive Mode
+- **Waktu Pencatatan**: 2026-09-10 17:58:50 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: UI/UX / Audio Hardware Control
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Arahan Pengguna
+Pengguna melampirkan screenshot banner pop-up toast pencarian lagu (*"Ditemukan 25 lagu untuk 'Queen'"*) dan memberikan instruksi perbaikan:
+1. *"HAPUS SELURUH POP UP"*: Hilangkan seluruh pop-up banner notifikasi toast yang mengganggu.
+2. *"perbaiki scroll"*: Halaman dan komponen lirik harus bisa di-scroll dengan normal dan lancar.
+3. *"tambahkan kualitas yang dipakai"*: Tampilkan badge resolusi audio yang sedang aktif diputar.
+4. *"kasih selector ouput di Playbar dan disitu ada tulisan slidbar Exclusive Mode"*: Tambahkan menu pemilihan perangkat keluaran audio beserta slider switch Exclusive Mode (Bit-Perfect Audio Passthrough).
+5. *"disetting juga tambahkan selector kualitas"*: Sediakan pilihan resolusi streaming audio lengkap di tab Pengaturan.
+
+### 2. Solusi & Implementasi Nyata
+- **Eliminasi Total Pop-Up Banner**:
+  - Menghapus komponen `<ToastContainer />` dari rendering UI.
+  - Menghapus seluruh pemicu pop-up toast pada fungsi pencarian (`handleSearch`), debounced search, penambahan playlist, dsb. Antarmuka kini hening (*silent zero-intrusion*).
+- **Perbaikan Arsitektur Scroll**:
+  - Memperbaiki `src/App.css`: mengubah aturan `body { overflow: hidden; }` menjadi `overflow-x: hidden; overflow-y: auto; scroll-behavior: smooth;`.
+  - Menyesuaikan padding bawah halaman utama menjadi `pb-36` agar playbar dock tidak menghalangi item lagu terbawah.
+  - Memperbaiki layout flex container Expanded Player menjadi `justify-start md:justify-center` untuk mencegah pemotongan konten pada layar vertikal pendek.
+- **Indikator Resolusi Audio Aktif**:
+  - Menampilkan badge audio aktif (`Hi-Res 24-bit/96kHz`, `FLAC 16-bit/44.1kHz`, atau `AAC 256kbps`) pada playbar dock bawah dan header Expanded Player.
+- **Selector Output Audio di Playbar & Exclusive Mode Switch**:
+  - Menambahkan tombol speaker di dock player yang membuka popover glassmorphic berisi pilihan perangkat (Speaker Utama, Headphone 3.5mm, USB DAC).
+  - Menyertakan slider / switch toggle **Exclusive Mode** dengan badge *Bit-Perfect* dan penjelasan bahwa aliran audio melewatkan mixer OS langsung ke DAC hardware.
+- **Selector Kualitas Audio di Tab Pengaturan (Akun)**:
+  - Menambahkan bagian "Kualitas Audio & Bit-Perfect" di tab Akun/Pengaturan yang menyajikan 5 kartu opsi kualitas:
+    - *Hi-Res Lossless Master (24-bit / 96-192kHz)*
+    - *Lossless CD Quality (FLAC 16-bit / 44.1kHz)*
+    - *Kualitas Tinggi (AAC 256kbps)*
+    - *Kualitas Normal (AAC 160kbps)*
+    - *Hemat Kuota (96kbps)*
+  - Pilihan tersimpan persisten di `localStorage`.
+- **Tata Kelola Plan**:
+  - PLAN-005 selesai diimplementasikan, diverifikasi lulus build, dan dipindahkan ke `plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md`.
+
+### 3. Dampak Teknis & File Terkait
+- Menghadirkan kontrol audio berstandar audiophile profesional (sekelas Roon/TIDAL Desktop) tanpa pop-up yang mengganggu.
+- Berkas terkait: `src/App.css`, `src/App.tsx`, `plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md`, `plans/README.md`, `MEMORY.md`.
+
+

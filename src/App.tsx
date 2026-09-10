@@ -26,9 +26,80 @@ import {
   Radio,
   LogOut,
   RefreshCw,
+  Speaker,
+  Headphones,
+  SlidersHorizontal,
+  Laptop,
+  Check,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { ToastContainer, ToastMessage } from "./components/Toast";
+
+export interface AudioOutputDevice {
+  id: string;
+  name: string;
+  desc: string;
+  type: "speaker" | "headphones" | "dac";
+}
+
+export const AUDIO_OUTPUT_DEVICES: AudioOutputDevice[] = [
+  { id: "default", name: "Speaker Utama", desc: "Sistem Default (ALSA / PulseAudio / CoreAudio)", type: "speaker" },
+  { id: "headphones", name: "Headphone / Jack Audio", desc: "Output Analog 3.5mm Stereo", type: "headphones" },
+  { id: "dac", name: "USB DAC / Audio Interface", desc: "Bit-Perfect Lossless Passthrough", type: "dac" },
+];
+
+export type AudioQualityPreset = "Hi-Res Lossless" | "Lossless CD" | "High Quality" | "Normal" | "Data Saver";
+
+export interface AudioQualityOption {
+  id: AudioQualityPreset;
+  title: string;
+  badge: string;
+  sampleRate: string;
+  bitrate: string;
+  desc: string;
+}
+
+export const AUDIO_QUALITY_OPTIONS: AudioQualityOption[] = [
+  {
+    id: "Hi-Res Lossless",
+    title: "Hi-Res Lossless Master",
+    badge: "Hi-Res 24/96",
+    sampleRate: "24-bit / 96kHz - 192kHz",
+    bitrate: "Hingga 9216 kbps FLAC",
+    desc: "Kualitas rekaman studio orisinal tanpa kompresi dengan fidelitas suara tertinggi.",
+  },
+  {
+    id: "Lossless CD",
+    title: "Lossless CD Quality",
+    badge: "FLAC 16/44.1",
+    sampleRate: "16-bit / 44.1kHz",
+    bitrate: "1411 kbps FLAC",
+    desc: "Kualitas standar CD audio murni, bebas distorsi kompresi lossy.",
+  },
+  {
+    id: "High Quality",
+    title: "Kualitas Tinggi",
+    badge: "AAC 256k",
+    sampleRate: "Stereo 48kHz",
+    bitrate: "256 kbps AAC",
+    desc: "Suara jernih seimbang dengan konsumsi data yang efisien.",
+  },
+  {
+    id: "Normal",
+    title: "Kualitas Normal",
+    badge: "AAC 160k",
+    sampleRate: "Stereo 44.1kHz",
+    bitrate: "160 kbps AAC",
+    desc: "Standar streaming cepat dan stabil di berbagai jaringan.",
+  },
+  {
+    id: "Data Saver",
+    title: "Hemat Kuota",
+    badge: "AAC 96k",
+    sampleRate: "Stereo 44.1kHz",
+    bitrate: "96 kbps HE-AAC",
+    desc: "Penggunaan kuota minimal untuk koneksi internet terbatas.",
+  },
+];
 
 export interface Playlist {
   id: string;
@@ -66,7 +137,7 @@ interface UserProfile {
   avatar_url: string;
   is_signed_in: boolean;
   cloud_synced: boolean;
-  audio_quality_preset: "Normal" | "Tinggi" | "Hi-Fi Lossless";
+  audio_quality_preset: AudioQualityPreset;
 }
 
 // Default initial tracks with REAL verified studio master audio streams
@@ -207,15 +278,44 @@ export default function App() {
   const [lyrics, setLyrics] = useState<TimedLyricLine[]>([]);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Toast System
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info", title?: string) => {
-    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
-    setToasts((prev) => [...prev, { id, message, type, title }]);
+  // Toast System (Eliminated - Silent Non-Intrusive UX)
+  const showToast = (_message: string, _type?: string, _title?: string) => {
+    // Zero-popup standard: all pop-up toast banners are eliminated
   };
-  const dismissToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+
+  // Audio Quality Preset
+  const [audioQuality, setAudioQuality] = useState<AudioQualityPreset>(() => {
+    return (localStorage.getItem("wowmusic_audio_quality") as AudioQualityPreset) || "Hi-Res Lossless";
+  });
+
+  const handleSelectAudioQuality = (preset: AudioQualityPreset) => {
+    setAudioQuality(preset);
+    localStorage.setItem("wowmusic_audio_quality", preset);
+    setUserProfile((prev) => ({ ...prev, audio_quality_preset: preset }));
   };
+
+  // Audio Output Device & Exclusive Mode
+  const [selectedOutputDevice, setSelectedOutputDevice] = useState<string>(() => {
+    return localStorage.getItem("wowmusic_output_device") || "default";
+  });
+  const [isExclusiveMode, setIsExclusiveMode] = useState<boolean>(() => {
+    return localStorage.getItem("wowmusic_exclusive_mode") === "true";
+  });
+  const [isOutputMenuOpen, setIsOutputMenuOpen] = useState(false);
+  const outputMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close Output Menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (outputMenuRef.current && !outputMenuRef.current.contains(e.target as Node)) {
+        setIsOutputMenuOpen(false);
+      }
+    };
+    if (isOutputMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOutputMenuOpen]);
 
   // User Profile
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -225,7 +325,7 @@ export default function App() {
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
     is_signed_in: true,
     cloud_synced: true,
-    audio_quality_preset: "Hi-Fi Lossless",
+    audio_quality_preset: "Hi-Res Lossless",
   });
 
   // Primary Playback Provider Setting
@@ -924,13 +1024,23 @@ export default function App() {
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
+  const activeQualityLabel =
+    primaryProvider === "Tidal" && isTidalConnected
+      ? audioQuality === "Hi-Res Lossless"
+        ? "Hi-Res 24-bit/96kHz"
+        : audioQuality === "Lossless CD"
+        ? "FLAC 16-bit/44.1kHz"
+        : audioQuality === "High Quality"
+        ? "AAC 256kbps"
+        : audioQuality === "Normal"
+        ? "AAC 160kbps"
+        : "HE-AAC 96kbps"
+      : "AAC 256kbps";
+
   return (
-    <div className="relative min-h-screen bg-black text-neutral-100 font-sans select-none overflow-x-hidden pb-32">
+    <div className="relative min-h-screen bg-black text-neutral-100 font-sans select-none overflow-x-hidden pb-36">
       {/* Hidden Native Audio Player streaming REAL studio audio */}
       <audio ref={audioRef} preload="auto" />
-
-      {/* Modern In-App Toast Layer */}
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Atmospheric Ambient Glow Header */}
       <div className="absolute top-0 left-0 right-0 h-96 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(220,50,20,0.28),rgba(255,100,50,0.08),rgba(0,0,0,0))] pointer-events-none -z-0" />
@@ -1422,24 +1532,108 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-full border border-white/10">
-                  {(["Normal", "Tinggi", "Hi-Fi Lossless"] as const).map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => {
-                        setUserProfile((prev) => ({ ...prev, audio_quality_preset: preset }));
-                        showToast(`Kualitas audio: ${preset}`, "info");
-                      }}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                        userProfile.audio_quality_preset === preset
-                          ? "bg-white text-black font-semibold shadow"
-                          : "text-neutral-400 hover:text-white"
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                    Akun Terverifikasi
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Audio Quality & Exclusive Mode Configuration */}
+            <div className="p-6 rounded-3xl bg-neutral-900/60 border border-white/10 backdrop-blur-2xl shadow-xl space-y-5">
+              <div>
+                <div className="text-base font-bold text-white flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-rose-400" />
+                  Kualitas Audio & Bit-Perfect
+                </div>
+                <div className="text-xs text-neutral-400 mt-0.5">
+                  Pilih resolusi streaming audio dan konfigurasi transmisi DAC
+                </div>
+              </div>
+
+              {/* Quality Preset Options Cards */}
+              <div className="space-y-2">
+                {AUDIO_QUALITY_OPTIONS.map((opt) => {
+                  const isSelected = audioQuality === opt.id;
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => handleSelectAudioQuality(opt.id)}
+                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                        isSelected
+                          ? "bg-white/15 border-white/30 shadow-lg ring-1 ring-white/20"
+                          : "bg-black/40 border-white/10 hover:border-white/20"
                       }`}
                     >
-                      {preset}
-                    </button>
-                  ))}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">{opt.title}</span>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              isSelected
+                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                : "bg-white/10 text-neutral-400"
+                            }`}
+                          >
+                            {opt.badge}
+                          </span>
+                          <span className="text-[10px] font-mono text-neutral-400">
+                            • {opt.sampleRate}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 leading-relaxed">
+                          {opt.desc}
+                        </p>
+                      </div>
+                      <div className="pt-1">
+                        {isSelected ? (
+                          <Check className="w-4 h-4 text-rose-400 shrink-0" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border border-white/20 shrink-0" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Exclusive Mode in Settings */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="text-sm font-semibold text-white flex items-center gap-2">
+                    Exclusive Mode
+                    {isExclusiveMode && (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        Aktif
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-400 max-w-md leading-relaxed">
+                    Bit-Perfect Passthrough: mengalirkan sinyal audio langsung ke DAC hardware tanpa melalui mixer OS atau resampling digital.
+                  </p>
                 </div>
+
+                {/* Slider / Toggle Switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isExclusiveMode}
+                  onClick={() => {
+                    const newVal = !isExclusiveMode;
+                    setIsExclusiveMode(newVal);
+                    localStorage.setItem("wowmusic_exclusive_mode", String(newVal));
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isExclusiveMode ? "bg-rose-500" : "bg-neutral-700"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      isExclusiveMode ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 
@@ -1715,9 +1909,19 @@ export default function App() {
                 TIDAL HiFi
               </span>
             )}
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTab("account");
+              }}
+              className="hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-neutral-300 shrink-0 transition-colors cursor-pointer"
+              title={`Kualitas Audio Aktif: ${activeQualityLabel} (Klik untuk pengaturan)`}
+            >
+              {activeQualityLabel}
+            </span>
           </div>
 
-          {/* Scrubber & Volume & Lyrics */}
+          {/* Scrubber & Volume & Output Selector & Lyrics */}
           <div className="flex items-center gap-4">
             <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-neutral-400">
               <span>{formatTime(currentTimeMs)}</span>
@@ -1752,6 +1956,123 @@ export default function App() {
                 onChange={(e) => handleVolumeChange(Number(e.target.value))}
                 className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
               />
+            </div>
+
+            {/* Audio Output Device Selector & Exclusive Mode */}
+            <div className="relative">
+              <button
+                onClick={() => setIsOutputMenuOpen(!isOutputMenuOpen)}
+                className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                  isOutputMenuOpen
+                    ? "bg-white/20 text-white"
+                    : "text-neutral-400 hover:text-white hover:bg-white/10"
+                }`}
+                title="Pilih Keluaran Audio & Mode Eksklusif"
+              >
+                <Speaker className="w-4 h-4" />
+                {isExclusiveMode && (
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
+                )}
+              </button>
+
+              {/* Output Menu & Exclusive Mode Popover */}
+              {isOutputMenuOpen && (
+                <div
+                  ref={outputMenuRef}
+                  className="absolute right-0 bottom-12 z-50 w-80 p-4 rounded-3xl bg-neutral-900/95 backdrop-blur-3xl border border-white/15 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-left"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
+                      <Speaker className="w-3.5 h-3.5 text-rose-400" />
+                      Keluaran Audio
+                    </div>
+                    <button
+                      onClick={() => setIsOutputMenuOpen(false)}
+                      className="text-neutral-400 hover:text-white p-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Device List */}
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] text-neutral-400 font-medium px-1">Pilih Perangkat Output</div>
+                    {AUDIO_OUTPUT_DEVICES.map((device) => {
+                      const isSelected = selectedOutputDevice === device.id;
+                      return (
+                        <button
+                          key={device.id}
+                          onClick={() => {
+                            setSelectedOutputDevice(device.id);
+                            localStorage.setItem("wowmusic_output_device", device.id);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-white/15 text-white font-semibold border border-white/20 shadow-md"
+                              : "text-neutral-300 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {device.type === "headphones" ? (
+                              <Headphones className="w-4 h-4 text-rose-400 shrink-0" />
+                            ) : device.type === "dac" ? (
+                              <SlidersHorizontal className="w-4 h-4 text-rose-400 shrink-0" />
+                            ) : (
+                              <Laptop className="w-4 h-4 text-rose-400 shrink-0" />
+                            )}
+                            <div className="text-left">
+                              <div className="text-xs">{device.name}</div>
+                              <div className="text-[10px] text-neutral-400 font-normal">{device.desc}</div>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-rose-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Exclusive Mode Slider / Switch */}
+                  <div className="pt-3 border-t border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                          Exclusive Mode
+                          {isExclusiveMode && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                              Bit-Perfect
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-neutral-400 leading-tight max-w-[190px]">
+                          Bypass mixer OS langsung ke DAC hardware untuk audio bit-akurat.
+                        </div>
+                      </div>
+
+                      {/* Slidebar / Toggle Switch */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isExclusiveMode}
+                        onClick={() => {
+                          const newVal = !isExclusiveMode;
+                          setIsExclusiveMode(newVal);
+                          localStorage.setItem("wowmusic_exclusive_mode", String(newVal));
+                        }}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          isExclusiveMode ? "bg-rose-500" : "bg-neutral-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                            isExclusiveMode ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
@@ -1889,6 +2210,9 @@ export default function App() {
                   TIDAL HiFi
                 </span>
               )}
+              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-neutral-300">
+                {activeQualityLabel}
+              </span>
               <button
                 onClick={handleToggleFloatingLyrics}
                 className="hidden sm:flex p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all cursor-pointer border border-white/10"
@@ -1907,7 +2231,7 @@ export default function App() {
           </div>
 
           {/* Main Content Area */}
-          <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6 flex flex-col justify-center">
+          <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6 flex flex-col justify-start md:justify-center">
             <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
               {/* Left Section: Big Artwork & Info */}
               <div

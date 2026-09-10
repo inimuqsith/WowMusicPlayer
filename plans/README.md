@@ -112,10 +112,12 @@ Daftar spesifik file dan penjelasan singkat perubahan masing-masing file.
 | **PLAN-002** | Universal Search & HiFi Stream Resolver | Streaming | [`plans/finished/PLAN-002-universal-search-and-resolver.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-002-universal-search-and-resolver.md) |
 | **PLAN-003** | Consumer UI Polish, Zero-Friction & Real LRCLIB | UI/UX | [`plans/finished/PLAN-003-consumer-ui-and-real-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-003-consumer-ui-and-real-lyrics.md) |
 | **PLAN-004** | Expanded Now Playing Fullscreen & Bottom Bar Lyrics | UI/UX | [`plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md) |
+| **PLAN-005** | Eliminasi Pop-Up, Perbaikan Scroll, Kualitas Audio & Output Selector Exclusive Mode | UI/UX & Audio | [`plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md) |
 
 ### ⚡ Sedang Berjalan (Active)
 *(Tidak ada plan aktif saat ini)*
 
 ### 💡 Draf Rencana Masa Depan (Drafts)
 *(Tidak ada draf saat ini)*
+
 
