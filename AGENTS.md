@@ -4,6 +4,30 @@ Dokumen ini adalah pedoman operasional mutlak bagi AI Agent (Antigravity, Cursor
 
 ---
 
+## ⚠️ PROTOKOL MUTLAK: WAJIB PLAN SEBELUM IMPLEMENTASI
+
+> **ATURAN BESI UNTUK AI AGENT (ANTIGRAVITY / CURSOR / COPILOT / DEVELOPER):**
+> 
+> **DILARANG KERAS LANGSUNG MENGEDIT KODE ATAU MEMBUAT ASUMSI SENDIRI ("SOK PAHAM").**
+>
+> Setiap kali ada penambahan fitur, perubahan kode, perbaikan bug, koreksi arsitektur, refactor, ataupun revisi:
+> 
+> 1. **WAJIB Membuat Plan Implementasi Terlebih Dahulu**:
+>    - Uraikan latar belakang masalah / kebutuhan fitur.
+>    - Sebutkan secara spesifik file mana saja yang akan dibuat atau dimodifikasi.
+>    - Tuliskan langkah-langkah kerja teknis (*step-by-step breakdown*) secara jelas dan rinci.
+>    - Paparkan potensi dampak (*impact analysis*), dependensi baru, atau trade-off.
+> 
+> 2. **WAJIB Menunggu Peninjauan & Persetujuan Eksplisit dari Pengguna**:
+>    - Tampilkan plan tersebut kepada pengguna untuk ditinjau (*review*).
+>    - **DILARANG KERAS** menyentuh file kode, menjalankan edit file, atau melakukan eksekusi sebelum pengguna memberikan persetujuan eksplisit (misal: *"Setuju"*, *"Lanjutkan"*, *"Oke Gass"*).
+> 
+> 3. **Eksekusi Terkendali Sesuai Plan**:
+>    - Kerjakan implementasi secara disiplin hanya mengikuti poin-poin yang disetujui.
+>    - Jika di tengah jalan ditemukan kendala teknis atau kebutuhan baru di luar cakupan plan, **BERHENTI SEGERA**, lalu ajukan revisi plan kepada pengguna untuk ditinjau ulang.
+
+---
+
 ## 1. Visi & Lingkup Proyek
 **WowMusicPlayer** adalah *independent universal music & playlist hub* lintas platform (Linux, Windows, macOS, Android, iOS) yang memadukan:
 1. **Sistem Playlist Mandiri (Universal Playlist Hub)**: Membangun perpustakaan playlist sendiri yang menyatukan lagu dari Spotify, YouTube Music, Apple Music, TIDAL, dan File Lokal dalam satu antrean utuh.
