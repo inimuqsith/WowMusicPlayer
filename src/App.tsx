@@ -14,9 +14,11 @@ import {
   ListMusic,
   X,
   PictureInPicture2,
-  MessageSquare,
   User,
   ChevronRight,
+  ChevronDown,
+  Maximize2,
+  Mic2,
   Disc3,
   ExternalLink,
   Search,
@@ -170,8 +172,13 @@ const POPULAR_SEARCH_TAGS = [
 const isTauri = typeof window !== "undefined" && Boolean((window as any).__TAURI_INTERNALS__);
 
 export default function App() {
-  // Navigation: "home", "search", "library", "lyrics", "account"
-  const [activeTab, setActiveTab] = useState<"home" | "search" | "library" | "lyrics" | "account">("home");
+  // Navigation: "home", "search", "library", "account"
+  const [activeTab, setActiveTab] = useState<"home" | "search" | "library" | "account">("home");
+
+  // Expanded Now Playing Overlay (Full Screen Player Mode)
+  const [isExpandedPlayerOpen, setIsExpandedPlayerOpen] = useState(false);
+  const [expandedTab, setExpandedTab] = useState<"art" | "lyrics">("art");
+  const expandedLyricsContainerRef = useRef<HTMLDivElement>(null);
 
   // Real Audio Element Reference
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -465,7 +472,24 @@ export default function App() {
         activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-  }, [activeLyricIndex]);
+    if (expandedLyricsContainerRef.current && activeLyricIndex !== -1) {
+      const activeEl = expandedLyricsContainerRef.current.children[activeLyricIndex] as HTMLElement;
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [activeLyricIndex, isExpandedPlayerOpen, expandedTab]);
+
+  // Escape Key to Close Expanded Player
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isExpandedPlayerOpen) {
+        setIsExpandedPlayerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpandedPlayerOpen]);
 
   // Broadcast to Floating Window Overlay
   useEffect(() => {
@@ -962,16 +986,6 @@ export default function App() {
             Playlist
           </button>
           <button
-            onClick={() => setActiveTab("lyrics")}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-              activeTab === "lyrics"
-                ? "bg-white/15 text-white shadow-sm"
-                : "text-neutral-400 hover:text-white"
-            }`}
-          >
-            Lirik
-          </button>
-          <button
             onClick={() => setActiveTab("account")}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
               activeTab === "account"
@@ -1375,78 +1389,7 @@ export default function App() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: LYRICS (Time-Synced Flowing Karaoke Screen)                        */}
-        {/* ========================================================================= */}
-        {activeTab === "lyrics" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[70vh] animate-in fade-in duration-300">
-            {/* Left Column: Big Cover Artwork */}
-            <div className="lg:col-span-5 flex flex-col items-center text-center space-y-5">
-              <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 group">
-                <img
-                  src={currentTrack.cover_url}
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white tracking-tight">{currentTrack.title}</h2>
-                <p className="text-sm text-neutral-400">{currentTrack.artist}</p>
-                {currentTrack.album && (
-                  <p className="text-xs text-neutral-500">{currentTrack.album}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column: Time-Synced Flowing Lyrics */}
-            <div className="lg:col-span-7 h-[65vh] flex flex-col">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-                <div className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
-                  Lirik
-                </div>
-                <div className="text-xs text-neutral-400">
-                  Klik baris lirik untuk melompat
-                </div>
-              </div>
-
-              <div
-                ref={lyricsContainerRef}
-                className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth"
-              >
-                {lyrics.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-center space-y-2 text-neutral-500">
-                    <MessageSquare className="w-8 h-8 opacity-40 text-neutral-400" />
-                    <div className="text-base font-medium text-neutral-300">Lirik belum tersedia</div>
-                    <div className="text-xs text-neutral-500">Lirik untuk "{currentTrack.title}" belum ditemukan di katalog.</div>
-                  </div>
-                ) : (
-                  lyrics.map((line, idx) => {
-                    const isActive = idx === activeLyricIndex;
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => handleSeek(line.timestamp_ms)}
-                        className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
-                          isActive
-                            ? "scale-105 text-white font-bold text-2xl sm:text-3xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
-                            : "text-neutral-500 hover:text-neutral-300 text-lg sm:text-xl font-medium filter blur-[0.2px] hover:blur-none"
-                        }`}
-                      >
-                        <div className="leading-snug">{line.text}</div>
-                        <span className="opacity-0 group-hover:opacity-100 text-xs font-mono text-neutral-400 bg-white/10 px-2 py-1 rounded-md transition-opacity">
-                          {formatTime(line.timestamp_ms)}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 5: ACCOUNT (Consumer Profile & Linked Services)                      */}
+        {/* TAB 4: ACCOUNT (Consumer Profile & Linked Services)                      */}
         {/* ========================================================================= */}
         {activeTab === "account" && (
           <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -1740,15 +1683,27 @@ export default function App() {
             </button>
           </div>
 
-          {/* Current Track Info */}
-          <div className="flex items-center gap-3.5 max-w-sm px-4 min-w-0">
-            <img
-              src={currentTrack.cover_url}
-              alt={currentTrack.title}
-              className="w-10 h-10 rounded-xl object-cover shadow border border-white/10 shrink-0"
-            />
+          {/* Current Track Info (Click to open Expanded Player) */}
+          <div
+            onClick={() => {
+              setIsExpandedPlayerOpen(true);
+              setExpandedTab("art");
+            }}
+            className="flex items-center gap-3.5 max-w-sm px-4 min-w-0 cursor-pointer group hover:opacity-90 transition-all select-none"
+            title="Klik untuk membuka tampilan layar penuh"
+          >
+            <div className="relative shrink-0">
+              <img
+                src={currentTrack.cover_url}
+                alt={currentTrack.title}
+                className="w-10 h-10 rounded-xl object-cover shadow border border-white/10 group-hover:scale-105 transition-transform"
+              />
+              <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <Maximize2 className="w-3.5 h-3.5 text-white drop-shadow" />
+              </div>
+            </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-white truncate leading-tight">
+              <div className="text-sm font-semibold text-white truncate leading-tight group-hover:text-rose-300 transition-colors">
                 {currentTrack.title}
               </div>
               <div className="text-xs text-neutral-400 truncate leading-tight mt-0.5">
@@ -1800,15 +1755,18 @@ export default function App() {
             </div>
 
             <button
-              onClick={() => setActiveTab("lyrics")}
+              onClick={() => {
+                setIsExpandedPlayerOpen(true);
+                setExpandedTab("lyrics");
+              }}
               className={`p-2 rounded-full transition-colors cursor-pointer ${
-                activeTab === "lyrics"
+                isExpandedPlayerOpen && expandedTab === "lyrics"
                   ? "bg-white/20 text-white"
                   : "text-neutral-400 hover:text-white hover:bg-white/10"
               }`}
-              title="Buka Layar Lirik"
+              title="Lirik Lagu"
             >
-              <MessageSquare className="w-4 h-4" />
+              <Mic2 className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1869,6 +1827,333 @@ export default function App() {
               >
                 Simpan
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* EXPANDED NOW PLAYING FULLSCREEN OVERLAY (Apple Music Style)              */}
+      {/* ========================================================================= */}
+      {isExpandedPlayerOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-3xl animate-in slide-in-from-bottom duration-300 overflow-hidden">
+          {/* Ambient Background Glow from Album Artwork */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25 select-none">
+            <img
+              src={currentTrack.cover_url}
+              alt=""
+              className="w-full h-full object-cover filter blur-3xl scale-125"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/70" />
+          </div>
+
+          {/* Top Header Bar of Expanded Player */}
+          <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <button
+              onClick={() => setIsExpandedPlayerOpen(false)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all cursor-pointer text-xs font-medium backdrop-blur-md border border-white/10"
+              title="Tutup (Esc)"
+            >
+              <ChevronDown className="w-4 h-4" />
+              <span>Tutup</span>
+            </button>
+
+            {/* Mobile / Tablet Tab Switcher (Lagu / Lirik) */}
+            <div className="lg:hidden flex items-center gap-1 p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-xs">
+              <button
+                onClick={() => setExpandedTab("art")}
+                className={`px-3 py-1 rounded-full font-medium transition-all ${
+                  expandedTab === "art"
+                    ? "bg-white text-black font-semibold shadow"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Lagu
+              </button>
+              <button
+                onClick={() => setExpandedTab("lyrics")}
+                className={`px-3 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                  expandedTab === "lyrics"
+                    ? "bg-white text-black font-semibold shadow"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                <Mic2 className="w-3 h-3" />
+                Lirik
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {primaryProvider === "Tidal" && isTidalConnected && (
+                <span className="hidden sm:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
+                  TIDAL HiFi
+                </span>
+              )}
+              <button
+                onClick={handleToggleFloatingLyrics}
+                className="hidden sm:flex p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all cursor-pointer border border-white/10"
+                title="Lirik Mengambang Mini"
+              >
+                <PictureInPicture2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsExpandedPlayerOpen(false)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all cursor-pointer border border-white/10"
+                title="Tutup (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6 flex flex-col justify-center">
+            <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
+              {/* Left Section: Big Artwork & Info */}
+              <div
+                className={`lg:col-span-5 flex flex-col items-center text-center space-y-6 ${
+                  expandedTab === "lyrics" ? "hidden lg:flex" : "flex"
+                }`}
+              >
+                <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-3xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/15">
+                  <img
+                    src={currentTrack.cover_url}
+                    alt={currentTrack.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="space-y-1.5 max-w-md">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+                    {currentTrack.title}
+                  </h2>
+                  <p className="text-base sm:text-lg text-neutral-400 font-medium">
+                    {currentTrack.artist}
+                  </p>
+                  {currentTrack.album && (
+                    <p className="text-xs text-neutral-500">
+                      {currentTrack.album}
+                    </p>
+                  )}
+                </div>
+
+                {/* Scrubber & Controls embedded on Mobile / Tablet view */}
+                <div className="w-full max-w-sm space-y-4 lg:hidden pt-2">
+                  {/* Scrubber */}
+                  <div className="space-y-1">
+                    <input
+                      type="range"
+                      min={0}
+                      max={durationMs || currentTrack.duration_secs * 1000}
+                      value={currentTimeMs}
+                      onChange={(e) => handleSeek(Number(e.target.value))}
+                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                    />
+                    <div className="flex justify-between text-[11px] font-mono text-neutral-400">
+                      <span>{formatTime(currentTimeMs)}</span>
+                      <span>{formatTime(durationMs || currentTrack.duration_secs * 1000)}</span>
+                    </div>
+                  </div>
+
+                  {/* Play Controls */}
+                  <div className="flex items-center justify-center gap-6">
+                    <button
+                      onClick={handlePrev}
+                      className="text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                      title="Sebelumnya"
+                    >
+                      <SkipBack className="w-6 h-6 fill-current" />
+                    </button>
+                    <button
+                      onClick={togglePlay}
+                      className="p-4 rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                      title={isPlaying ? "Jeda" : "Putar"}
+                    >
+                      {isPlaying ? (
+                        <Pause className="w-7 h-7 fill-current" />
+                      ) : (
+                        <Play className="w-7 h-7 fill-current ml-0.5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      className="text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                      title="Berikutnya"
+                    >
+                      <SkipForward className="w-6 h-6 fill-current" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Section: Time-Synced Flowing Lyrics */}
+              <div
+                className={`lg:col-span-7 h-[60vh] sm:h-[65vh] flex flex-col ${
+                  expandedTab === "art" ? "hidden lg:flex" : "flex"
+                }`}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-neutral-400 uppercase">
+                    <Mic2 className="w-3.5 h-3.5 text-rose-400" />
+                    Lirik
+                  </div>
+                  <div className="text-xs text-neutral-500">
+                    Klik baris lirik untuk melompat
+                  </div>
+                </div>
+
+                <div
+                  ref={expandedLyricsContainerRef}
+                  className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth"
+                >
+                  {lyrics.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-center space-y-2 text-neutral-500">
+                      <Mic2 className="w-10 h-10 opacity-30 text-neutral-400" />
+                      <div className="text-base font-medium text-neutral-300">Lirik belum tersedia</div>
+                      <div className="text-xs text-neutral-500">Lirik untuk "{currentTrack.title}" belum ditemukan di katalog.</div>
+                    </div>
+                  ) : (
+                    lyrics.map((line, idx) => {
+                      const isActive = idx === activeLyricIndex;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => handleSeek(line.timestamp_ms)}
+                          className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
+                            isActive
+                              ? "scale-105 text-white font-bold text-2xl sm:text-3xl drop-shadow-[0_0_30px_rgba(255,255,255,0.45)]"
+                              : "text-neutral-500 hover:text-neutral-300 text-lg sm:text-xl font-medium filter blur-[0.2px] hover:blur-none"
+                          }`}
+                        >
+                          <div className="leading-snug">{line.text}</div>
+                          <span className="opacity-0 group-hover:opacity-100 text-xs font-mono text-neutral-400 bg-white/10 px-2 py-1 rounded-md transition-opacity">
+                            {formatTime(line.timestamp_ms)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Mobile / Tablet controls below lyrics if viewing lyrics tab */}
+                <div className="w-full space-y-3 lg:hidden pt-4 border-t border-white/10 mt-2">
+                  <div className="flex justify-between items-center text-xs text-neutral-400">
+                    <span className="font-medium text-white truncate max-w-[200px]">{currentTrack.title}</span>
+                    <span className="font-mono">{formatTime(currentTimeMs)} / {formatTime(durationMs || currentTrack.duration_secs * 1000)}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-6">
+                    <button onClick={handlePrev} className="text-neutral-300 hover:text-white cursor-pointer">
+                      <SkipBack className="w-5 h-5 fill-current" />
+                    </button>
+                    <button
+                      onClick={togglePlay}
+                      className="p-3 rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                    >
+                      {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                    </button>
+                    <button onClick={handleNext} className="text-neutral-300 hover:text-white cursor-pointer">
+                      <SkipForward className="w-5 h-5 fill-current" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Full Controls Footer on Expanded Player */}
+          <div className="hidden lg:block relative z-10 px-8 py-5 border-t border-white/10 bg-black/60 backdrop-blur-xl">
+            <div className="max-w-4xl mx-auto space-y-3">
+              {/* Scrubber */}
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-mono text-neutral-400 w-12 text-right">
+                  {formatTime(currentTimeMs)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={durationMs || currentTrack.duration_secs * 1000}
+                  value={currentTimeMs}
+                  onChange={(e) => handleSeek(Number(e.target.value))}
+                  className="flex-1 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-rose-400 transition-colors"
+                />
+                <span className="text-xs font-mono text-neutral-400 w-12">
+                  {formatTime(durationMs || currentTrack.duration_secs * 1000)}
+                </span>
+              </div>
+
+              {/* Action Buttons & Volume */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsShuffle(!isShuffle)}
+                    className={`p-2 rounded-full transition-colors cursor-pointer ${
+                      isShuffle ? "text-rose-400 bg-rose-400/10" : "text-neutral-400 hover:text-white"
+                    }`}
+                    title="Acak"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setIsRepeat(!isRepeat)}
+                    className={`p-2 rounded-full transition-colors cursor-pointer ${
+                      isRepeat ? "text-rose-400 bg-rose-400/10" : "text-neutral-400 hover:text-white"
+                    }`}
+                    title="Ulangi"
+                  >
+                    <Repeat className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={handlePrev}
+                    className="text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Sebelumnya"
+                  >
+                    <SkipBack className="w-6 h-6 fill-current" />
+                  </button>
+                  <button
+                    onClick={togglePlay}
+                    className="p-3.5 rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                    title={isPlaying ? "Jeda" : "Putar"}
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-6 h-6 fill-current" />
+                    ) : (
+                      <Play className="w-6 h-6 fill-current ml-0.5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Berikutnya"
+                  >
+                    <SkipForward className="w-6 h-6 fill-current" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleVolumeChange(isMuted ? 0.85 : 0)}
+                    className="text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {isMuted || volume === 0 ? (
+                      <VolumeX className="w-4 h-4" />
+                    ) : (
+                      <Volume2 className="w-4 h-4" />
+                    )}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                    className="w-24 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

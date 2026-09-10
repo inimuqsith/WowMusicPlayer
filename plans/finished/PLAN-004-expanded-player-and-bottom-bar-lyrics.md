@@ -1,13 +1,13 @@
 # 📋 PLAN-004: Expanded Now Playing Fullscreen & Bottom Bar Lyrics
 
 - **ID Plan**: PLAN-004
-- **Status**: Draft (Awaiting User Approval)
+- **Status**: Finished
 - **Kategori**: UI/UX & Player Navigation
 - **Target File**: 
   - `src/App.tsx`
   - `plans/README.md`
 - **Tanggal Dibuat**: 2026-09-10
-- **Tanggal Selesai**: -
+- **Tanggal Selesai**: 2026-09-10
 
 ---
 
@@ -71,9 +71,9 @@ Sesuai arahan dan tinjauan langsung pengguna:
 ---
 
 ### 5. Kriteria Penerimaan & Verifikasi Nyata (Acceptance Criteria)
-- [ ] Tab "Lirik" tidak ada lagi di bar navigasi atas.
-- [ ] Mengklik icon cover atau judul lagu di play bar bawah langsung membuka mode Expanded Player layar penuh.
-- [ ] Mengklik icon lirik di play bar bawah langsung menampilkan lirik lagu yang sedang diputar.
-- [ ] Mode layar penuh memiliki tombol tutup / kembali ke tampilan sebelumnya dengan mulus.
-- [ ] Musik terus berputar secara kontinyu tanpa stuttering saat membuka atau menutup mode penuh.
-- [ ] Build `pnpm build` dan `cargo check` lulus 100% tanpa error atau warning.
+- [x] Tab "Lirik" tidak ada lagi di bar navigasi atas.
+- [x] Mengklik icon cover atau judul lagu di play bar bawah langsung membuka mode Expanded Player layar penuh.
+- [x] Mengklik icon lirik di play bar bawah langsung menampilkan lirik lagu yang sedang diputar.
+- [x] Mode layar penuh memiliki tombol tutup / kembali ke tampilan sebelumnya dengan mulus.
+- [x] Musik terus berputar secara kontinyu tanpa stuttering saat membuka atau menutup mode penuh.
+- [x] Build `pnpm build` dan `cargo check` lulus 100% tanpa error atau warning.

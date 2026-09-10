@@ -111,12 +111,11 @@ Daftar spesifik file dan penjelasan singkat perubahan masing-masing file.
 | **PLAN-001** | Core Architecture & Native Audio Engine Setup | Audio Core | [`plans/finished/PLAN-001-core-architecture-and-audio.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-001-core-architecture-and-audio.md) |
 | **PLAN-002** | Universal Search & HiFi Stream Resolver | Streaming | [`plans/finished/PLAN-002-universal-search-and-resolver.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-002-universal-search-and-resolver.md) |
 | **PLAN-003** | Consumer UI Polish, Zero-Friction & Real LRCLIB | UI/UX | [`plans/finished/PLAN-003-consumer-ui-and-real-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-003-consumer-ui-and-real-lyrics.md) |
+| **PLAN-004** | Expanded Now Playing Fullscreen & Bottom Bar Lyrics | UI/UX | [`plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md) |
 
 ### ⚡ Sedang Berjalan (Active)
 *(Tidak ada plan aktif saat ini)*
 
 ### 💡 Draf Rencana Masa Depan (Drafts)
-| ID | Judul Plan | Kategori | Lokasi Berkas |
-| :--- | :--- | :--- | :--- |
-| **PLAN-004** | Expanded Now Playing Fullscreen & Bottom Bar Lyrics | UI/UX | [`plans/drafts/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/drafts/PLAN-004-expanded-player-and-bottom-bar-lyrics.md) |
+*(Tidak ada draf saat ini)*
 

@@ -419,3 +419,36 @@ Sesuai arahan eksplisit pengguna (*"Kamu buatkan folder Plan disana didalamnya f
 ### 3. Dampak Teknis & File Terkait
 - Terciptanya repositori dokumen rencana kerja yang rapi, terlacak di Git, dan transparan.
 - Berkas terkait: `plans/README.md`, `plans/finished/*`, `plans/drafts/*`, `plans/active/.gitkeep`, `AGENTS.md`, `MEMORY.md`.
+
+---
+
+## [MEM-016] Implementasi Mode Penuh (Expanded Now Playing) & Pemindahan Lirik ke Play Bar
+- **Waktu Pencatatan**: 2026-09-10 17:49:50 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: UI/UX & Player Navigation
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Evaluasi Pengguna
+Pengguna menghapus draf lama yang belum disetujui dan memberikan arahan perbaikan UX:
+1. *"diplay barnya harus nya mencet judul icon musik itu masuk ke mode full"*: Area cover art dan judul musik di dock bawah harus dapat diklik untuk membuka tampilan layar penuh (Expanded Now Playing view) ala Apple Music.
+2. *"lirik itu juga jangan diatas tapi di play bar"*: Tab "Lirik" di navigation bar atas dihilangkan agar navigasi atas bersih (hanya Beranda, Cari, Playlist, Akun). Tombol lirik dipindahkan langsung ke play bar bawah (dock) agar terintegrasi dengan pemutar.
+
+### 2. Solusi & Implementasi Nyata
+- **Pembersihan Navigasi Header Atas**:
+  - Menghapus tab "Lirik" dari center pill bar atas.
+  - `activeTab` disederhanakan menjadi `"home" | "search" | "library" | "account"`.
+- **Interaktivitas Dock Play Bar Bawah**:
+  - Mengubah blok info lagu (cover art + title + artist) menjadi tombol interaktif dengan hover overlay (`Maximize2`) yang membuka mode Expanded Player saat diklik.
+  - Menempatkan tombol lirik (`Mic2`) langsung di dock play bar di samping scrubber dan volume; saat diklik langsung membuka Expanded Player dalam mode fokus lirik.
+- **Komponen Layar Penuh (Expanded Now Playing Sheet)**:
+  - Tampilan layar penuh OLED pekat (`#000000`) dengan ambient dynamic glow dari cover album.
+  - Desktop view: Tata letak berdampingan (*side-by-side*) antara Cover Art besar & kontrol pemutaran di sisi kiri, dan Lirik Waktu-Nyata (*Time-Synced Lyrics*) dinamis LRCLIB dengan auto-scroll di sisi kanan.
+  - Mobile/Tablet view: Tab switcher intuitif antara "Lagu" dan "Lirik".
+  - Tombol minimize (`ChevronDown` / Tutup / Tombol keyboard `Escape`) untuk kembali ke katalog tanpa memutus atau menjeda pemutaran musik.
+- **Tata Kelola Plan**:
+  - Rencana kerja PLAN-004 disetujui, dieksekusi, diverifikasi nyata via browser, dan dipindahkan ke `plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`.
+
+### 3. Dampak Teknis & File Terkait
+- Pengalaman konsumer meningkat tajam, setara dengan standar estetika Apple Music / Spotify Desktop.
+- Berkas terkait: `src/App.tsx`, `plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`, `plans/README.md`, `MEMORY.md`.
+
