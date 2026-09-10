@@ -8,7 +8,6 @@ import {
   VolumeX,
   Shuffle,
   Repeat,
-  Sparkles,
   CheckCircle2,
   Plus,
   Trash2,
@@ -23,7 +22,6 @@ import {
   Search,
   Loader2,
   Radio,
-  Link2,
   LogOut,
   RefreshCw,
 } from "lucide-react";
@@ -137,22 +135,25 @@ const INITIAL_CURATED_TRACKS: UnifiedTrackItem[] = [
   },
 ];
 
-const DEFAULT_LYRICS: TimedLyricLine[] = [
-  { timestamp_ms: 0, text: "Is this the real life?" },
-  { timestamp_ms: 4500, text: "Is this just fantasy?" },
-  { timestamp_ms: 8500, text: "Caught in a landslide, no escape from reality" },
-  { timestamp_ms: 15500, text: "Open your eyes, look up to the skies and see" },
-  { timestamp_ms: 24000, text: "I'm just a poor boy, I need no sympathy" },
-  { timestamp_ms: 30000, text: "Because I'm easy come, easy go, little high, little low" },
-  { timestamp_ms: 38000, text: "Any way the wind blows doesn't really matter to me, to me" },
-  { timestamp_ms: 49000, text: "Mama, just killed a man" },
-  { timestamp_ms: 55000, text: "Put a gun against his head, pulled my trigger, now he's dead" },
-  { timestamp_ms: 63000, text: "Mama, life had just begun" },
-  { timestamp_ms: 69000, text: "But now I've gone and thrown it all away" },
-  { timestamp_ms: 76000, text: "Mama, ooh, didn't mean to make you cry" },
-  { timestamp_ms: 84000, text: "If I'm not back again this time tomorrow" },
-  { timestamp_ms: 89000, text: "Carry on, carry on as if nothing really matters" },
-];
+function parseLrc(lrcText: string): TimedLyricLine[] {
+  const lines = lrcText.split("\n");
+  const result: TimedLyricLine[] = [];
+  const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+  for (const line of lines) {
+    const match = line.match(timeRegex);
+    if (match) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      const ms = match[3].length === 2 ? parseInt(match[3], 10) * 10 : parseInt(match[3], 10);
+      const timestamp_ms = (minutes * 60 + seconds) * 1000 + ms;
+      const text = match[4].trim();
+      if (text) {
+        result.push({ timestamp_ms, text });
+      }
+    }
+  }
+  return result;
+}
 
 const POPULAR_SEARCH_TAGS = [
   "Queen",
@@ -196,8 +197,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<UnifiedTrackItem[]>([]);
 
   // Lyrics
-  const [lyrics, setLyrics] = useState<TimedLyricLine[]>(DEFAULT_LYRICS);
-  const [lyricsSource, setLyricsSource] = useState<string>("LRCLIB (Time-Synced)");
+  const [lyrics, setLyrics] = useState<TimedLyricLine[]>([]);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   // Toast System
@@ -225,8 +225,6 @@ export default function App() {
   const [primaryProvider, setPrimaryProvider] = useState<"Tidal" | "Spotify" | "Local" | "Preview">(() => {
     return (localStorage.getItem("wowmusic_primary_provider") as any) || "Tidal";
   });
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [unlinkedProviderTarget, setUnlinkedProviderTarget] = useState<string>("Tidal");
 
   // TIDAL Connection State & Token Persistence
   const [isConnectingTidal, setIsConnectingTidal] = useState(false);
@@ -358,31 +356,69 @@ export default function App() {
     fetchTopCharts();
   }, []);
 
-  // 2. Lyrics Fetching
+  // 2. Lyrics Fetching (Real LRCLIB Engine with Dual Web & Tauri Support)
   useEffect(() => {
     async function loadLyrics() {
-      if (!currentTrack.title || currentTrack.id === "empty") return;
+      if (!currentTrack.title || currentTrack.id === "empty") {
+        setLyrics([]);
+        return;
+      }
+
+      // Clean track title (remove " - Single", " (feat...)", etc. for accurate matching)
+      const cleanTitle = currentTrack.title
+        .replace(/\s*-\s*Single/i, "")
+        .replace(/\s*\(feat\..*?\)/i, "")
+        .replace(/\s*\[feat\..*?\]/i, "")
+        .trim();
+
       try {
-        const payload = await invoke<{
-          is_synced: boolean;
-          lines: TimedLyricLine[];
-          source: string;
-        }>("fetch_lyrics", {
-          trackName: currentTrack.title,
-          artistName: currentTrack.artist,
-          albumName: currentTrack.album,
-          durationSecs: currentTrack.duration_secs,
-        });
-        if (payload && payload.lines && payload.lines.length > 0) {
-          setLyrics(payload.lines);
-          setLyricsSource(payload.source);
-          return;
+        const resp = await fetch(
+          `https://lrclib.net/api/get?artist_name=${encodeURIComponent(currentTrack.artist)}&track_name=${encodeURIComponent(cleanTitle)}`
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.syncedLyrics) {
+            const parsed = parseLrc(data.syncedLyrics);
+            if (parsed.length > 0) {
+              setLyrics(parsed);
+              return;
+            }
+          } else if (data.plainLyrics) {
+            const plainLines = data.plainLyrics
+              .split("\n")
+              .filter((l: string) => l.trim().length > 0)
+              .map((text: string, i: number) => ({
+                timestamp_ms: i * 4000,
+                text: text.trim(),
+              }));
+            setLyrics(plainLines);
+            return;
+          }
         }
       } catch (err) {
-        // Fallback
+        // Fallback to Tauri if network fetch failed
       }
-      setLyrics(DEFAULT_LYRICS);
-      setLyricsSource("LRCLIB (Time-Synced)");
+
+      if (isTauri) {
+        try {
+          const payload = await invoke<{
+            is_synced: boolean;
+            lines: TimedLyricLine[];
+          }>("fetch_lyrics", {
+            trackName: cleanTitle,
+            artistName: currentTrack.artist,
+            albumName: currentTrack.album,
+            durationSecs: currentTrack.duration_secs,
+          });
+          if (payload && payload.lines && payload.lines.length > 0) {
+            setLyrics(payload.lines);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // If no lyrics found, set empty cleanly
+      setLyrics([]);
     }
     loadLyrics();
   }, [currentTrack]);
@@ -536,29 +572,14 @@ export default function App() {
     let finalQuality = trk.audio_quality;
     let isFullPlayback = false;
 
-    // Check primary provider setting & connected services
-    if (primaryProvider === "Tidal") {
-      if (tidalToken) {
-        showToast(`Mencari stream TIDAL HiFi: ${trk.title}...`, "info");
-        const resolved = await resolveTidalStream(trk, tidalToken);
-        if (resolved?.streamUrl) {
-          finalStreamUrl = resolved.streamUrl;
-          finalQuality = "TIDAL Master Lossless";
-          isFullPlayback = true;
-          showToast(`Memutar lagu penuh via TIDAL: ${trk.title}`, "success", "TIDAL HiFi");
-        } else {
-          showToast(`Trek tidak ditemukan di TIDAL. Menggunakan pratinjau studio.`, "warning");
-        }
-      } else {
-        // Unlinked provider! Popup modal appears to prompt linking
-        setUnlinkedProviderTarget("Tidal");
-        setIsLinkModalOpen(true);
-        showToast(`TIDAL belum tertaut. Memutar pratinjau studio 30s.`, "info");
+    // Check primary provider setting & connected services (Silent & Seamless)
+    if (primaryProvider === "Tidal" && tidalToken) {
+      const resolved = await resolveTidalStream(trk, tidalToken);
+      if (resolved?.streamUrl) {
+        finalStreamUrl = resolved.streamUrl;
+        finalQuality = "TIDAL HiFi";
+        isFullPlayback = true;
       }
-    } else if (primaryProvider === "Spotify") {
-      setUnlinkedProviderTarget("Spotify");
-      setIsLinkModalOpen(true);
-      showToast(`Spotify belum tertaut. Memutar pratinjau studio 30s.`, "info");
     }
 
     if (audioRef.current && finalStreamUrl) {
@@ -572,10 +593,6 @@ export default function App() {
       durationMs: isFullPlayback ? trk.duration_secs * 1000 : 30000,
       qualityLabel: finalQuality,
     }).catch(() => {});
-
-    if (!isFullPlayback && primaryProvider === "Preview") {
-      showToast(`Memutar: ${trk.title} - ${trk.artist} (Preview)`, "info");
-    }
   };
 
   const togglePlay = () => {
@@ -818,15 +835,6 @@ export default function App() {
   const handleSelectPrimaryProvider = (provider: "Tidal" | "Spotify" | "Local" | "Preview") => {
     setPrimaryProvider(provider);
     localStorage.setItem("wowmusic_primary_provider", provider);
-    showToast(`Provider utama diatur ke: ${provider}`, "info");
-
-    if (provider === "Tidal" && !isTidalConnected) {
-      setUnlinkedProviderTarget("Tidal");
-      setIsLinkModalOpen(true);
-    } else if (provider === "Spotify") {
-      setUnlinkedProviderTarget("Spotify");
-      setIsLinkModalOpen(true);
-    }
   };
 
   // Playlist Management
@@ -998,14 +1006,11 @@ export default function App() {
           <div className="space-y-10 animate-in fade-in duration-300">
             {/* Hero Header */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-xs font-semibold text-rose-400 uppercase tracking-widest">
-                <Sparkles className="w-3.5 h-3.5" /> Musik Asli Tanpa Batas
-              </div>
               <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
                 Dengarkan Musik Favorit
               </h1>
               <p className="text-neutral-400 text-sm max-w-xl">
-                Streaming rekaman studio asli langsung dari katalog dunia. Putar lagu apa saja sekarang.
+                Jelajahi dan putar tangga lagu terpopuler dari seluruh dunia.
               </p>
             </div>
 
@@ -1060,7 +1065,7 @@ export default function App() {
                     Lagu Populer Dunia Saat Ini <ChevronRight className="w-4 h-4 text-neutral-500" />
                   </h2>
                   <p className="text-xs text-neutral-400 mt-0.5">
-                    Putar langsung tanpa login. Mendukung audio studio 30s atau lagu penuh via provider.
+                    Lagu yang paling banyak didengarkan saat ini.
                   </p>
                 </div>
                 <button
@@ -1387,22 +1392,20 @@ export default function App() {
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold text-white tracking-tight">{currentTrack.title}</h2>
                 <p className="text-sm text-neutral-400">{currentTrack.artist}</p>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-neutral-300 mt-2">
-                  <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-                  <span>{currentTrack.audio_quality}</span>
-                </div>
+                {currentTrack.album && (
+                  <p className="text-xs text-neutral-500">{currentTrack.album}</p>
+                )}
               </div>
             </div>
 
             {/* Right Column: Time-Synced Flowing Lyrics */}
             <div className="lg:col-span-7 h-[65vh] flex flex-col">
               <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-                <div className="text-xs font-semibold tracking-wider text-rose-400 uppercase flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  {lyricsSource}
+                <div className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
+                  Lirik
                 </div>
                 <div className="text-xs text-neutral-400">
-                  Klik baris lirik untuk melompat langsung
+                  Klik baris lirik untuk melompat
                 </div>
               </div>
 
@@ -1410,25 +1413,33 @@ export default function App() {
                 ref={lyricsContainerRef}
                 className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth"
               >
-                {lyrics.map((line, idx) => {
-                  const isActive = idx === activeLyricIndex;
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => handleSeek(line.timestamp_ms)}
-                      className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
-                        isActive
-                          ? "scale-105 text-white font-bold text-2xl sm:text-3xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
-                          : "text-neutral-500 hover:text-neutral-300 text-lg sm:text-xl font-medium filter blur-[0.2px] hover:blur-none"
-                      }`}
-                    >
-                      <div className="leading-snug">{line.text}</div>
-                      <span className="opacity-0 group-hover:opacity-100 text-xs font-mono text-neutral-400 bg-white/10 px-2 py-1 rounded-md transition-opacity">
-                        {formatTime(line.timestamp_ms)}
-                      </span>
-                    </div>
-                  );
-                })}
+                {lyrics.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-center space-y-2 text-neutral-500">
+                    <MessageSquare className="w-8 h-8 opacity-40 text-neutral-400" />
+                    <div className="text-base font-medium text-neutral-300">Lirik belum tersedia</div>
+                    <div className="text-xs text-neutral-500">Lirik untuk "{currentTrack.title}" belum ditemukan di katalog.</div>
+                  </div>
+                ) : (
+                  lyrics.map((line, idx) => {
+                    const isActive = idx === activeLyricIndex;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSeek(line.timestamp_ms)}
+                        className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
+                          isActive
+                            ? "scale-105 text-white font-bold text-2xl sm:text-3xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]"
+                            : "text-neutral-500 hover:text-neutral-300 text-lg sm:text-xl font-medium filter blur-[0.2px] hover:blur-none"
+                        }`}
+                      >
+                        <div className="leading-snug">{line.text}</div>
+                        <span className="opacity-0 group-hover:opacity-100 text-xs font-mono text-neutral-400 bg-white/10 px-2 py-1 rounded-md transition-opacity">
+                          {formatTime(line.timestamp_ms)}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -1744,24 +1755,10 @@ export default function App() {
                 {currentTrack.artist}
               </div>
             </div>
-            {primaryProvider === "Tidal" && isTidalConnected ? (
-              <span className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                TIDAL HiFi Penuh
+            {primaryProvider === "Tidal" && isTidalConnected && (
+              <span className="hidden md:inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 shrink-0">
+                TIDAL HiFi
               </span>
-            ) : (
-              <button
-                onClick={() => {
-                  setUnlinkedProviderTarget(primaryProvider);
-                  setIsLinkModalOpen(true);
-                }}
-                className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-semibold px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-neutral-300 transition-colors cursor-pointer shrink-0"
-                title="Klik untuk menautkan akun agar lagu diputar penuh"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span>Preview 30s</span>
-                <span className="text-rose-400 font-bold underline ml-0.5">Tautkan Akun</span>
-              </button>
             )}
           </div>
 
@@ -1871,61 +1868,6 @@ export default function App() {
                 className="px-5 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-neutral-200 transition-colors shadow-lg cursor-pointer"
               >
                 Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Tautkan Provider (Muncul jika belum set link provider utama) */}
-      {isLinkModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md p-6 rounded-3xl bg-neutral-900 border border-white/15 shadow-2xl space-y-5">
-            <button
-              onClick={() => setIsLinkModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 border border-rose-500/30 flex items-center justify-center">
-              <Link2 className="w-6 h-6 text-rose-400" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-lg font-bold text-white tracking-tight">
-                Tautkan Akun {unlinkedProviderTarget}
-              </h3>
-              <p className="text-xs text-neutral-300 leading-relaxed">
-                Anda memilih <strong>{unlinkedProviderTarget}</strong> sebagai provider utama pemutaran. Hubungkan akun Anda untuk mendengarkan lagu secara utuh tanpa batas preview 30 detik.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 text-xs text-neutral-400 flex items-start gap-2.5">
-              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <span>
-                Jika belum ditautkan, pemutaran lagu otomatis menggunakan <strong>audio pratinjau studio 30 detik</strong> sebagai fallback bawaan.
-              </span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
-              <button
-                onClick={() => {
-                  setIsLinkModalOpen(false);
-                  setActiveTab("account");
-                  if (unlinkedProviderTarget === "Tidal") {
-                    handleStartTidalAuth();
-                  }
-                }}
-                className="w-full py-2.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer shadow-lg"
-              >
-                Tautkan {unlinkedProviderTarget} Sekarang
-              </button>
-              <button
-                onClick={() => setIsLinkModalOpen(false)}
-                className="w-full py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-neutral-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                Lanjutkan Pratinjau (30s)
               </button>
             </div>
           </div>

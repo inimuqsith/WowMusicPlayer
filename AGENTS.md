@@ -31,10 +31,12 @@ Dokumen ini adalah pedoman operasional mutlak bagi AI Agent (Antigravity, Cursor
 >    - **Audio Wajib Bersuara Nyata**: Modul audio wajib mengalirkan sampel PCM nyata ke hardware output (ALSA / PulseAudio / PipeWire / WASAPI / CoreAudio) via `cpal` & `symphonia`. Suara harus benar-benar terdengar dari speaker/headphone pengguna saat tombol Play ditekan.
 >    - **Standar UI Apple Music / Hi-Fi Premium (Zero-Slop)**:
 >      - **Haram Menggunakan Dialog Browser**: DILARANG KERAS menggunakan `alert()`, `confirm()`, atau `prompt()` bawaan browser.
->      - Seluruh feedback (sukses/gagal/peringatan) wajib menggunakan **In-App Toast** atau Modal modern yang terintegrasi (Lucide icons, dark glassmorphism, Framer Motion).
->      - Desain antarmuka wajib mengacu pada estetika **Apple Music / Modern Hi-Fi**: Canvas hitam pekat OLED (`#000000`), ambient glow halus, floating glass capsule/dock controls, typografi tajam dan lapang, serta bebas dari developer clutter/form teknis kriptografi yang membingungkan.
+>      - **Bebas Pop-Up Penghalang & Spam Toast**: Pemutaran lagu harus instan dan hening (*unobtrusive*). Dilarang keras menampilkan pop-up modal penghalang atau spam notifikasi toast setiap kali pengguna menekan tombol Play.
+>      - **Haram Menggunakan Jargon Teknis Developer**: DILARANG KERAS menampilkan istilah seperti *"Musik Asli"*, *"LRCLIB (Time-Synced)"*, *"Master Audio 256kbps"*, *"AES-256-GCM Vault"*, *"Connected to VPS"*. Gunakan copywriting konsumer elegan: *"Dengarkan Musik Favorit"*, *"Lagu Populer Dunia"*, *"Lirik"*.
+>      - **Lirik Nyata & Dinamis (No Fake Lyrics)**: Lirik wajib diambil secara dinamis dari LRCLIB sesuai lagu dan artis yang sedang diputar. Dilarang keras menampilkan lirik palsu/statis dari lagu lain (seperti Bohemian Rhapsody) jika lirik lagu tersebut tidak ditemukan.
+>      - Desain antarmuka wajib mengacu pada estetika **Apple Music / Modern Hi-Fi**: Canvas hitam pekat OLED (`#000000`), ambient glow halus, floating glass capsule/dock controls, typografi tajam dan lapang.
 >      - Enkripsi Vault (AES-256-GCM) wajib bekerja otomatis di latar belakang (*invisible zero-knowledge*), berbasis akun (Google Sign-In).
->    - **Pengujian Nyata Sebelum Menutup Task**: Wajib memverifikasi aplikasi secara live di desktop sebelum menyatakan milestone selesai.
+>    - **Pengujian Nyata Sebelum Menutup Task**: Wajib memverifikasi aplikasi secara live di desktop/browser sebelum menyatakan milestone selesai.
 
 ---
 

@@ -357,6 +357,39 @@ Pengguna menegaskan visi produk: WowMusicPlayer adalah **pemutar musik mandiri (
   - Fungsi `resolveTidalStream` mencocokkan trek ke TIDAL, mengambil manifest streaming resmi (`playbackinfopostpaywall`), mendekode JSON BTS Base64, dan memutar URL stream audio lossless penuh dari CDN TIDAL.
   - Dock player menampilkan badge interaktif: `[ TIDAL HiFi Penuh ]` atau `[ Preview 30s • Tautkan Akun ]`.
 
+---
+
+## [MEM-014] Eliminasi Pop-Up Penghalang, Pembersihan Total Jargon Teknis Developer & Integrasi Lirik LRCLIB Otomatis
+- **Waktu Pencatatan**: 2026-09-10 17:34:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Consumer UX / Audio Engine / Lyrics Engine / Developer Skill
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Evaluasi Keras Pengguna
+Pengguna mengkritik keras munculnya pop-up modal dan notifikasi saat ingin memutar lagu, teks teknis yang kaku, serta lirik yang tidak terkoneksi dengan benar:
+1. *"Gausah dikasih pop up, menyetel musik, dll. apalah itu gak guna anjir"* -> Pengguna tidak ingin diinterupsi oleh pop-up modal saat memutar lagu. Pemutaran harus instan dan hening.
+2. *"KENAPA SIH KAMU TETAP PAKAI ISTILAH TEKNIS SEPERTI MUSIK ASLI, YA EMANG MUSIK, TERUS LRCLIB TIME SYNCED APALAH"* -> Pengguna menghendaki bahasa konsumer murni kelas Apple Music, bukan jargon developer.
+3. *"LRCLIB Nya belum terkoneksi dengan baik"* -> Lirik sebelumnya bocor ke lagu statis Queen karena fetch lirik belum memanggil API publik LRCLIB langsung di mode web browser.
+4. *"Btw kamu patuh MD ndak, kalau bisa buatkan SKILL.md juga, dll. dan SELALU UPDATE MD NYAAA"* -> Wajib patuh mutlak pada dokumentasi, membuat file skill Antigravity (`SKILL.md`), dan selalu memperbarui seluruh file `.md`.
+
+### 2. Solusi & Implementasi
+- **Zero-Intrusion Playback**:
+  - Menghapus komponen modal `isLinkModalOpen` secara menyeluruh.
+  - Menghapus seluruh spam notifikasi toast pemutaran lagu (*"Memutar: ..."*, *"Mencari stream..."*).
+  - Pilihan provider utama di menu Akun kini berganti secara hening (*silent switch*).
+- **Integrasi Penuh LRCLIB Tanpa Lirik Palsu**:
+  - Menambahkan parser format LRC `parseLrc` dan fetcher langsung ke `https://lrclib.net/api/get` (didukung CORS penuh di web browser dan Tauri).
+  - Lirik sinkron kata/baris kini otomatis diambil sesuai artis dan judul lagu aktif.
+  - Jika lirik tidak ditemukan, menampilkan status bersih *"Lirik belum tersedia"* tanpa membocorkan lirik lagu lain.
+- **Pembersihan Total Bahasa Teknis**:
+  - Hapus tag *"Musik Asli Tanpa Batas"* -> diganti *"Dengarkan Musik Favorit"*.
+  - Hapus label *"LRCLIB (Time-Synced)"* di layar Lirik -> diganti label minimalis *"Lirik"*.
+  - Hapus badge bitrate/kualitas teknis yang berjejal di layar lirik dan dock player.
+- **Pembuatan Skill Antigravity**:
+  - Membuat skill `.agents/skills/wowmusic-core/SKILL.md` yang merangkum aturan emas arsitektur, testing nyata, zero-slop UX, dan kepatuhan mutlak dokumentasi.
+  - Memperbarui aturan besi di `AGENTS.md`.
+
+
 
 
 
