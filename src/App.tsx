@@ -325,7 +325,7 @@ export default function App() {
   }, [isOutputMenuOpen]);
 
   // Enumerate Real Hardware Audio Devices (Desktop Tauri cpal & Web MediaDevices)
-  const refreshAudioDevices = useCallback(async (requestPermission = false) => {
+  const refreshAudioDevices = useCallback(async () => {
     setIsScanningDevices(true);
     try {
       // 1. Try Tauri native backend cpal enumeration
@@ -372,15 +372,6 @@ export default function App() {
 
       // 2. Web MediaDevices API
       if (typeof navigator !== "undefined" && navigator.mediaDevices) {
-        if (requestPermission) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach((track) => track.stop());
-          } catch (e) {
-            console.warn("Audio permission not granted:", e);
-          }
-        }
-
         const devices = await navigator.mediaDevices.enumerateDevices();
         const outputs = devices.filter((d) => d.kind === "audiooutput");
 
@@ -389,7 +380,7 @@ export default function App() {
           const isDefault = d.deviceId === "default" || index === 0;
 
           if (!label) {
-            label = isDefault ? "Speaker / Perangkat Output Utama" : `Keluaran Audio #${index + 1}`;
+            label = isDefault ? "Speaker Utama / Default Sistem" : `Output Audio #${index + 1}`;
           }
 
           const lower = label.toLowerCase();
@@ -403,7 +394,7 @@ export default function App() {
           return {
             id: d.deviceId || (isDefault ? "default" : `sink-${index}`),
             name: label,
-            desc: isDefault ? "Perangkat Output Utama Sistem" : "Hardware Audio Sink",
+            desc: isDefault ? "Output Audio Utama Sistem" : "Keluaran Audio Eksternal",
             type,
             isDefault,
           };
@@ -413,8 +404,8 @@ export default function App() {
         if (parsedDevices.length === 0) {
           parsedDevices.push({
             id: "default",
-            name: "Sistem Output Standar",
-            desc: "ALSA / PipeWire / PulseAudio Master Sink",
+            name: "Speaker Utama / Default Sistem",
+            desc: "ALSA / PipeWire / CoreAudio Master Sink",
             type: "speaker",
             isDefault: true,
           });
@@ -468,10 +459,10 @@ export default function App() {
 
   // Real Hardware Audio Devices enumeration on mount & on device changes
   useEffect(() => {
-    refreshAudioDevices(false);
+    refreshAudioDevices();
 
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.addEventListener) {
-      const onDeviceChange = () => refreshAudioDevices(false);
+      const onDeviceChange = () => refreshAudioDevices();
       navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
       return () => {
         navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
@@ -2133,7 +2124,7 @@ export default function App() {
                   const nextOpen = !isOutputMenuOpen;
                   setIsOutputMenuOpen(nextOpen);
                   if (nextOpen) {
-                    refreshAudioDevices(false);
+                    refreshAudioDevices();
                   }
                 }}
                 className={`p-2 rounded-full transition-colors cursor-pointer relative ${
@@ -2163,7 +2154,7 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => refreshAudioDevices(false)}
+                        onClick={() => refreshAudioDevices()}
                         title="Pindai ulang hardware audio"
                         className="text-neutral-400 hover:text-white p-1 cursor-pointer transition rounded-lg hover:bg-white/10"
                       >
@@ -2177,18 +2168,6 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-
-                  {/* Permission / Hardware Scan helper if labels are generic or default */}
-                  {audioOutputDevices.some((d) => !d.name || d.name.startsWith("Keluaran Audio #") || d.id === "default") && (
-                    <button
-                      onClick={() => refreshAudioDevices(true)}
-                      disabled={isScanningDevices}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isScanningDevices ? "animate-spin" : ""}`} />
-                      Deteksi Nama Hardware Fisik (Izinkan Akses)
-                    </button>
-                  )}
 
                   {/* Device List */}
                   <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">

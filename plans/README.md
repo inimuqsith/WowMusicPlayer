@@ -114,6 +114,7 @@ Daftar spesifik file dan penjelasan singkat perubahan masing-masing file.
 | **PLAN-004** | Expanded Now Playing Fullscreen & Bottom Bar Lyrics | UI/UX | [`plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-004-expanded-player-and-bottom-bar-lyrics.md) |
 | **PLAN-005** | Eliminasi Pop-Up, Perbaikan Scroll, Kualitas Audio & Output Selector Exclusive Mode | UI/UX & Audio | [`plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md) |
 | **PLAN-006** | Deteksi Perangkat Keras Audio Nyata & Switching Sink Eksklusif (Anti-Gimmick) | Audio Core | [`plans/finished/PLAN-006-real-hardware-audio-device-detection-and-exclusive-sink.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-006-real-hardware-audio-device-detection-and-exclusive-sink.md) |
+| **PLAN-007** | Eliminasi Tombol Izin Teknis & Pembersihan Menu Keluaran Audio | UI/UX & Consumer Polish | [`plans/finished/PLAN-007-remove-technical-audio-permission-button.md`](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-007-remove-technical-audio-permission-button.md) |
 
 ### ⚡ Sedang Berjalan (Active)
 *(Tidak ada plan aktif saat ini)*

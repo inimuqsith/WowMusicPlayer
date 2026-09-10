@@ -531,4 +531,30 @@ Pengguna mengevaluasi menu keluaran audio dengan keras (*"kok gini keluarkan aud
 - Menjamin WowMusicPlayer beroperasi sebagai audio hub profesional sejati yang berkomunikasi langsung dengan hardware audio pengguna tanpa gimmick data palsu.
 - Berkas terkait: `src-tauri/src/audio/mod.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`, `plans/finished/PLAN-006-real-hardware-audio-device-detection-and-exclusive-sink.md`, `plans/README.md`, `MEMORY.md`.
 
+---
+
+## [MEM-019] Eliminasi Tombol Izin Teknis & Pembersihan Menu Keluaran Audio (Zero-Jargon Apple Music Standard)
+- **Waktu Pencatatan**: 2026-09-10 18:15:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: UI/UX / Consumer Polish
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Arahan Pengguna
+Pengguna menanyakan tombol *"Deteksi Nama Hardware Fisik (Izinkan Akses)"* di popover Keluaran Audio (*"apa ini ?"*). Tombol tersebut berbau jargon teknis pengembang dan merusak estetika bersih Apple Music. Sesuai kesepakatan pengguna (*"okeee"*), tombol ini dieliminasi total agar antarmuka kembali minimalis, elegan, dan tanpa beban teknis.
+
+### 2. Solusi & Implementasi Nyata
+- **Pembersihan Total Elemen UI Teknis**:
+  - Menghapus 100% elemen tombol *"Deteksi Nama Hardware Fisik (Izinkan Akses)"* dari komponen popover Keluaran Audio di [src/App.tsx](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/src/App.tsx).
+- **Deteksi Otomatis & Hening (*Silent Invisible Detection*)**:
+  - Deteksi sink audio fisik sistem (PipeWire, ALSA, CoreAudio, atau sink browser) berjalan otomatis di latar belakang tanpa menuntut tindakan atau klik tambahan dari pengguna.
+  - Memperbarui fallback label perangkat audio jika label disamarkan browser menjadi copywriting konsumer yang bersih (*"Speaker Utama / Default Sistem"* dan *"Keluaran Audio Eksternal"*).
+- **Hasil Visual**:
+  - Popover Keluaran Audio kini hanya memuat header elegan, daftar sink perangkat fisik yang rapi, dan slider toggle Exclusive Mode (Bit-Perfect Passthrough).
+- **Tata Kelola Plan**:
+  - PLAN-007 diselesaikan, seluruh kriteria verifikasi terpenuhi 100%, dan dipindahkan ke [plans/finished/PLAN-007-remove-technical-audio-permission-button.md](file:///home/muqsith/orca/workspaces/WowMusicPlayer/main/plans/finished/PLAN-007-remove-technical-audio-permission-button.md).
+
+### 3. Dampak Teknis & File Terkait
+- Antarmuka WowMusicPlayer kembali mencapai standar kemewahan Zero-Slop Apple Music / Modern Hi-Fi.
+- Berkas terkait: `src/App.tsx`, `plans/finished/PLAN-007-remove-technical-audio-permission-button.md`, `plans/README.md`, `MEMORY.md`.
+
 
