@@ -162,6 +162,8 @@ const POPULAR_SEARCH_TAGS = [
   "Bruno Mars",
 ];
 
+const isTauri = typeof window !== "undefined" && Boolean((window as any).__TAURI_INTERNALS__);
+
 export default function App() {
   // Navigation: "home", "search", "library", "lyrics", "account"
   const [activeTab, setActiveTab] = useState<"home" | "search" | "library" | "lyrics" | "account">("home");
@@ -229,19 +231,37 @@ export default function App() {
 
   const currentTrack = tracks[currentTrackIndex] || INITIAL_CURATED_TRACKS[0];
 
-  // 1. Initial Load: Playlists from SQLite
+  // 1. Initial Load: Playlists from SQLite (or localStorage in web browser mode)
   const loadPlaylists = async () => {
-    try {
-      const list = await invoke<Playlist[]>("db_get_playlists");
-      if (list && list.length > 0) {
-        setPlaylists(list);
-        const targetId = list.some((p) => p.id === activePlaylistId) ? activePlaylistId : list[0].id;
-        setActivePlaylistId(targetId);
-        await loadPlaylistTracks(targetId);
-        return;
+    if (isTauri) {
+      try {
+        const list = await invoke<Playlist[]>("db_get_playlists");
+        if (list && list.length > 0) {
+          setPlaylists(list);
+          const targetId = list.some((p) => p.id === activePlaylistId) ? activePlaylistId : list[0].id;
+          setActivePlaylistId(targetId);
+          await loadPlaylistTracks(targetId);
+          return;
+        }
+      } catch (err) {
+        console.warn("Using sample playlist:", err);
       }
-    } catch (err) {
-      console.warn("Using sample playlist in preview mode:", err);
+    } else {
+      const saved = localStorage.getItem("wowmusic_playlists");
+      if (saved) {
+        try {
+          const list = JSON.parse(saved);
+          if (list && list.length > 0) {
+            setPlaylists(list);
+            setActivePlaylistId(list[0].id);
+            const savedTracks = localStorage.getItem(`wowmusic_tracks_${list[0].id}`);
+            if (savedTracks) {
+              setTracks(JSON.parse(savedTracks));
+              return;
+            }
+          }
+        } catch (e) {}
+      }
     }
     setPlaylists([
       {
@@ -529,7 +549,7 @@ export default function App() {
     }
   };
 
-  // TIDAL Connection Handler with Automatic Background Polling
+  // TIDAL Connection Handler with Automatic Background Polling (Dual Tauri + Web Browser Support)
   const handleStartTidalAuth = async () => {
     setIsConnectingTidal(true);
     setTidalAuthCode(null);
@@ -539,14 +559,37 @@ export default function App() {
     }
 
     try {
-      const res = await invoke<{
+      let res: {
         device_code: string;
         user_code: string;
         verification_uri: string;
         verification_uri_complete?: string;
         expires_in: number;
         interval: number;
-      }>("tidal_start_device_auth");
+      };
+
+      if (isTauri) {
+        res = await invoke("tidal_start_device_auth");
+      } else {
+        const f = await fetch("https://auth.tidal.com/v1/oauth2/device_authorization", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: "fX2JxdmntZWK0ixT",
+            scope: "r_usr w_usr w_sub",
+          }),
+        });
+        if (!f.ok) throw new Error(`TIDAL Auth error (${f.status})`);
+        const j = await f.json();
+        res = {
+          device_code: j.deviceCode,
+          user_code: j.userCode,
+          verification_uri: j.verificationUri,
+          verification_uri_complete: j.verificationUriComplete,
+          expires_in: j.expiresIn,
+          interval: j.interval || 2,
+        };
+      }
 
       const linkUrl = res.verification_uri_complete
         ? `https://${res.verification_uri_complete}`
@@ -559,10 +602,26 @@ export default function App() {
       const intervalSecs = Math.max(res.interval || 2, 2);
       const timer = setInterval(async () => {
         try {
-          const token = await invoke<{
-            access_token: string;
-            user_id?: number;
-          } | null>("tidal_poll_device_token", { deviceCode: res.device_code });
+          let token: { access_token: string; user_id?: number } | null = null;
+          if (isTauri) {
+            token = await invoke("tidal_poll_device_token", { deviceCode: res.device_code });
+          } else {
+            const p = await fetch("https://auth.tidal.com/v1/oauth2/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                client_id: "fX2JxdmntZWK0ixT",
+                client_secret: "1Nn9AfDAjxrgJFJbKNWLeAyKGVGmINuXPPLHVXAvxAg=",
+                device_code: res.device_code,
+                grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+                scope: "r_usr w_usr w_sub",
+              }),
+            });
+            if (p.ok) {
+              const pj = await p.json();
+              token = { access_token: pj.access_token, user_id: pj.user_id };
+            }
+          }
 
           if (token) {
             clearInterval(timer);
@@ -580,7 +639,7 @@ export default function App() {
 
       setPollIntervalId(timer);
     } catch (err: any) {
-      showToast(`Gagal menghubungi TIDAL: ${err}`, "error");
+      showToast(`Gagal menghubungi TIDAL: ${err.message || err}`, "error");
     } finally {
       setIsConnectingTidal(false);
     }
@@ -602,18 +661,34 @@ export default function App() {
       return;
     }
     try {
-      const newPl = await invoke<Playlist>("db_create_playlist", {
-        title: newTitle.trim(),
-        description: newDesc.trim() || null,
-        coverUrl: null,
-      });
-      setPlaylists((prev) => [newPl, ...prev]);
-      setActivePlaylistId(newPl.id);
+      if (isTauri) {
+        const newPl = await invoke<Playlist>("db_create_playlist", {
+          title: newTitle.trim(),
+          description: newDesc.trim() || null,
+          coverUrl: null,
+        });
+        setPlaylists((prev) => [newPl, ...prev]);
+        setActivePlaylistId(newPl.id);
+      } else {
+        const newPl: Playlist = {
+          id: `pl-${Date.now()}`,
+          title: newTitle.trim(),
+          description: newDesc.trim() || undefined,
+          cover_url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
+          track_count: 0,
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        };
+        const updated = [newPl, ...playlists];
+        setPlaylists(updated);
+        localStorage.setItem("wowmusic_playlists", JSON.stringify(updated));
+        setActivePlaylistId(newPl.id);
+      }
       setTracks([]);
       setIsCreateModalOpen(false);
       setNewTitle("");
       setNewDesc("");
-      showToast(`Playlist "${newPl.title}" berhasil dibuat`, "success");
+      showToast(`Playlist "${newTitle}" berhasil dibuat`, "success");
     } catch (e) {
       showToast(`Gagal membuat playlist: ${e}`, "error");
     }
