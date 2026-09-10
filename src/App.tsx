@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -39,13 +39,10 @@ export interface AudioOutputDevice {
   name: string;
   desc: string;
   type: "speaker" | "headphones" | "dac";
+  channels?: number;
+  sampleRate?: number;
+  isDefault?: boolean;
 }
-
-export const AUDIO_OUTPUT_DEVICES: AudioOutputDevice[] = [
-  { id: "default", name: "Speaker Utama", desc: "Sistem Default (ALSA / PulseAudio / CoreAudio)", type: "speaker" },
-  { id: "headphones", name: "Headphone / Jack Audio", desc: "Output Analog 3.5mm Stereo", type: "headphones" },
-  { id: "dac", name: "USB DAC / Audio Interface", desc: "Bit-Perfect Lossless Passthrough", type: "dac" },
-];
 
 export type AudioQualityPreset = "Hi-Res Lossless" | "Lossless CD" | "High Quality" | "Normal" | "Data Saver";
 
@@ -294,7 +291,7 @@ export default function App() {
     setUserProfile((prev) => ({ ...prev, audio_quality_preset: preset }));
   };
 
-  // Audio Output Device & Exclusive Mode
+  // Real Hardware Audio Output Device & Exclusive Mode
   const [selectedOutputDevice, setSelectedOutputDevice] = useState<string>(() => {
     return localStorage.getItem("wowmusic_output_device") || "default";
   });
@@ -303,6 +300,16 @@ export default function App() {
   });
   const [isOutputMenuOpen, setIsOutputMenuOpen] = useState(false);
   const outputMenuRef = useRef<HTMLDivElement>(null);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<AudioOutputDevice[]>([
+    {
+      id: "default",
+      name: "Sistem Output Utama",
+      desc: "PipeWire / ALSA Master Hardware Sink",
+      type: "speaker",
+      isDefault: true,
+    },
+  ]);
+  const [isScanningDevices, setIsScanningDevices] = useState(false);
 
   // Click outside to close Output Menu
   useEffect(() => {
@@ -316,6 +323,171 @@ export default function App() {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOutputMenuOpen]);
+
+  // Enumerate Real Hardware Audio Devices (Desktop Tauri cpal & Web MediaDevices)
+  const refreshAudioDevices = useCallback(async (requestPermission = false) => {
+    setIsScanningDevices(true);
+    try {
+      // 1. Try Tauri native backend cpal enumeration
+      let tauriDevices: AudioOutputDevice[] = [];
+      try {
+        const nativeDevs = await invoke<
+          Array<{
+            name: string;
+            is_default: boolean;
+            max_sample_rate: number;
+            supported_channels: number;
+          }>
+        >("get_audio_devices");
+
+        if (Array.isArray(nativeDevs) && nativeDevs.length > 0) {
+          tauriDevices = nativeDevs.map((d, index) => {
+            const lower = d.name.toLowerCase();
+            const type: AudioOutputDevice["type"] =
+              lower.includes("headphone") || lower.includes("earphone") || lower.includes("headset") || lower.includes("jack")
+                ? "headphones"
+                : lower.includes("dac") || lower.includes("usb") || lower.includes("hifi") || lower.includes("interface") || lower.includes("hdmi")
+                ? "dac"
+                : "speaker";
+
+            return {
+              id: d.is_default ? "default" : `tauri-${index}-${d.name}`,
+              name: d.name,
+              desc: `${d.is_default ? "Default Sistem • " : ""}${d.supported_channels}ch • ${d.max_sample_rate} Hz`,
+              type,
+              channels: d.supported_channels,
+              sampleRate: d.max_sample_rate,
+              isDefault: d.is_default,
+            };
+          });
+        }
+      } catch {
+        // Not in Tauri or Tauri command failed, fallback to Web API
+      }
+
+      if (tauriDevices.length > 0) {
+        setAudioOutputDevices(tauriDevices);
+        return;
+      }
+
+      // 2. Web MediaDevices API
+      if (typeof navigator !== "undefined" && navigator.mediaDevices) {
+        if (requestPermission) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+          } catch (e) {
+            console.warn("Audio permission not granted:", e);
+          }
+        }
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const outputs = devices.filter((d) => d.kind === "audiooutput");
+
+        const parsedDevices: AudioOutputDevice[] = outputs.map((d, index) => {
+          let label = d.label;
+          const isDefault = d.deviceId === "default" || index === 0;
+
+          if (!label) {
+            label = isDefault ? "Speaker / Perangkat Output Utama" : `Keluaran Audio #${index + 1}`;
+          }
+
+          const lower = label.toLowerCase();
+          const type: AudioOutputDevice["type"] =
+            lower.includes("headphone") || lower.includes("earphone") || lower.includes("headset") || lower.includes("jack")
+              ? "headphones"
+              : lower.includes("dac") || lower.includes("usb") || lower.includes("hifi") || lower.includes("interface") || lower.includes("hdmi")
+              ? "dac"
+              : "speaker";
+
+          return {
+            id: d.deviceId || (isDefault ? "default" : `sink-${index}`),
+            name: label,
+            desc: isDefault ? "Perangkat Output Utama Sistem" : "Hardware Audio Sink",
+            type,
+            isDefault,
+          };
+        });
+
+        // Fallback if no outputs listed
+        if (parsedDevices.length === 0) {
+          parsedDevices.push({
+            id: "default",
+            name: "Sistem Output Standar",
+            desc: "ALSA / PipeWire / PulseAudio Master Sink",
+            type: "speaker",
+            isDefault: true,
+          });
+        }
+
+        setAudioOutputDevices(parsedDevices);
+      }
+    } catch (err) {
+      console.warn("Error enumerating audio devices:", err);
+    } finally {
+      setIsScanningDevices(false);
+    }
+  }, []);
+
+  const handleSelectOutputDevice = async (device: AudioOutputDevice) => {
+    setSelectedOutputDevice(device.id);
+    localStorage.setItem("wowmusic_output_device", device.id);
+
+    // Apply to browser HTMLAudioElement if supported
+    if (audioRef.current && typeof (audioRef.current as any).setSinkId === "function") {
+      try {
+        const sinkId = device.id.startsWith("tauri-") ? "default" : device.id;
+        await (audioRef.current as any).setSinkId(sinkId);
+      } catch (err) {
+        console.warn("Sink ID routing error:", err);
+      }
+    }
+
+    // Inform Tauri backend
+    try {
+      await invoke("set_audio_device", {
+        deviceName: device.name,
+        exclusive: isExclusiveMode,
+      });
+    } catch {
+      // Ignore if not in desktop mode
+    }
+  };
+
+  const handleToggleExclusiveMode = async () => {
+    const newVal = !isExclusiveMode;
+    setIsExclusiveMode(newVal);
+    localStorage.setItem("wowmusic_exclusive_mode", String(newVal));
+
+    try {
+      await invoke("set_exclusive_mode", { enabled: newVal });
+    } catch {
+      // Ignore if not in desktop mode
+    }
+  };
+
+  // Real Hardware Audio Devices enumeration on mount & on device changes
+  useEffect(() => {
+    refreshAudioDevices(false);
+
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.addEventListener) {
+      const onDeviceChange = () => refreshAudioDevices(false);
+      navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+      return () => {
+        navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+      };
+    }
+  }, [refreshAudioDevices]);
+
+  // Re-sync sinkId to HTMLAudioElement when device or audioRef changes
+  useEffect(() => {
+    if (audioRef.current && typeof (audioRef.current as any).setSinkId === "function") {
+      if (selectedOutputDevice && !selectedOutputDevice.startsWith("tauri-")) {
+        (audioRef.current as any).setSinkId(selectedOutputDevice).catch(() => {});
+      }
+    }
+  }, [selectedOutputDevice]);
+
 
   // User Profile
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -1619,11 +1791,7 @@ export default function App() {
                   type="button"
                   role="switch"
                   aria-checked={isExclusiveMode}
-                  onClick={() => {
-                    const newVal = !isExclusiveMode;
-                    setIsExclusiveMode(newVal);
-                    localStorage.setItem("wowmusic_exclusive_mode", String(newVal));
-                  }}
+                  onClick={handleToggleExclusiveMode}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     isExclusiveMode ? "bg-rose-500" : "bg-neutral-700"
                   }`}
@@ -1961,7 +2129,13 @@ export default function App() {
             {/* Audio Output Device Selector & Exclusive Mode */}
             <div className="relative">
               <button
-                onClick={() => setIsOutputMenuOpen(!isOutputMenuOpen)}
+                onClick={() => {
+                  const nextOpen = !isOutputMenuOpen;
+                  setIsOutputMenuOpen(nextOpen);
+                  if (nextOpen) {
+                    refreshAudioDevices(false);
+                  }
+                }}
                 className={`p-2 rounded-full transition-colors cursor-pointer relative ${
                   isOutputMenuOpen
                     ? "bg-white/20 text-white"
@@ -1979,7 +2153,7 @@ export default function App() {
               {isOutputMenuOpen && (
                 <div
                   ref={outputMenuRef}
-                  className="absolute right-0 bottom-12 z-50 w-80 p-4 rounded-3xl bg-neutral-900/95 backdrop-blur-3xl border border-white/15 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-left"
+                  className="absolute right-0 bottom-12 z-50 w-84 p-4 rounded-3xl bg-neutral-900/95 backdrop-blur-3xl border border-white/15 shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95 duration-200 text-left"
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
@@ -1987,33 +2161,56 @@ export default function App() {
                       <Speaker className="w-3.5 h-3.5 text-rose-400" />
                       Keluaran Audio
                     </div>
-                    <button
-                      onClick={() => setIsOutputMenuOpen(false)}
-                      className="text-neutral-400 hover:text-white p-1 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => refreshAudioDevices(false)}
+                        title="Pindai ulang hardware audio"
+                        className="text-neutral-400 hover:text-white p-1 cursor-pointer transition rounded-lg hover:bg-white/10"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isScanningDevices ? "animate-spin text-rose-400" : ""}`} />
+                      </button>
+                      <button
+                        onClick={() => setIsOutputMenuOpen(false)}
+                        className="text-neutral-400 hover:text-white p-1 cursor-pointer transition rounded-lg hover:bg-white/10"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Permission / Hardware Scan helper if labels are generic or default */}
+                  {audioOutputDevices.some((d) => !d.name || d.name.startsWith("Keluaran Audio #") || d.id === "default") && (
+                    <button
+                      onClick={() => refreshAudioDevices(true)}
+                      disabled={isScanningDevices}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isScanningDevices ? "animate-spin" : ""}`} />
+                      Deteksi Nama Hardware Fisik (Izinkan Akses)
+                    </button>
+                  )}
+
                   {/* Device List */}
-                  <div className="space-y-1.5">
-                    <div className="text-[11px] text-neutral-400 font-medium px-1">Pilih Perangkat Output</div>
-                    {AUDIO_OUTPUT_DEVICES.map((device) => {
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    <div className="text-[11px] text-neutral-400 font-medium px-1 flex items-center justify-between">
+                      <span>Perangkat Fisik ({audioOutputDevices.length})</span>
+                      {isScanningDevices && (
+                        <span className="text-[10px] text-rose-400 animate-pulse">Memindai...</span>
+                      )}
+                    </div>
+                    {audioOutputDevices.map((device) => {
                       const isSelected = selectedOutputDevice === device.id;
                       return (
                         <button
                           key={device.id}
-                          onClick={() => {
-                            setSelectedOutputDevice(device.id);
-                            localStorage.setItem("wowmusic_output_device", device.id);
-                          }}
+                          onClick={() => handleSelectOutputDevice(device)}
                           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs transition-all cursor-pointer ${
                             isSelected
                               ? "bg-white/15 text-white font-semibold border border-white/20 shadow-md"
                               : "text-neutral-300 hover:bg-white/5 hover:text-white"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
                             {device.type === "headphones" ? (
                               <Headphones className="w-4 h-4 text-rose-400 shrink-0" />
                             ) : device.type === "dac" ? (
@@ -2021,9 +2218,11 @@ export default function App() {
                             ) : (
                               <Laptop className="w-4 h-4 text-rose-400 shrink-0" />
                             )}
-                            <div className="text-left">
-                              <div className="text-xs">{device.name}</div>
-                              <div className="text-[10px] text-neutral-400 font-normal">{device.desc}</div>
+                            <div className="text-left min-w-0">
+                              <div className="text-xs truncate font-medium">{device.name}</div>
+                              <div className="text-[10px] text-neutral-400 font-normal truncate">
+                                {device.desc}
+                              </div>
                             </div>
                           </div>
                           {isSelected && <Check className="w-4 h-4 text-rose-400 shrink-0" />}
@@ -2054,11 +2253,7 @@ export default function App() {
                         type="button"
                         role="switch"
                         aria-checked={isExclusiveMode}
-                        onClick={() => {
-                          const newVal = !isExclusiveMode;
-                          setIsExclusiveMode(newVal);
-                          localStorage.setItem("wowmusic_exclusive_mode", String(newVal));
-                        }}
+                        onClick={handleToggleExclusiveMode}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                           isExclusiveMode ? "bg-rose-500" : "bg-neutral-700"
                         }`}

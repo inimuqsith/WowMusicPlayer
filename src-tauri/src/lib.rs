@@ -26,6 +26,18 @@ fn get_audio_devices() -> Vec<AudioDeviceInfo> {
 }
 
 #[tauri::command]
+fn set_audio_device(state: State<AppState>, device_name: String, exclusive: bool) -> PlaybackStatus {
+    state.audio_engine.set_output_device(&device_name, exclusive);
+    state.audio_engine.get_status()
+}
+
+#[tauri::command]
+fn set_exclusive_mode(state: State<AppState>, enabled: bool) -> PlaybackStatus {
+    state.audio_engine.set_exclusive_mode(enabled);
+    state.audio_engine.get_status()
+}
+
+#[tauri::command]
 fn play_track(state: State<AppState>, track_id: String, duration_ms: u64, quality_label: String) -> PlaybackStatus {
     state.audio_engine.play_track(&track_id, duration_ms, &quality_label);
     state.audio_engine.get_status()
@@ -260,6 +272,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_audio_devices,
+            set_audio_device,
+            set_exclusive_mode,
             play_track,
             pause_playback,
             resume_playback,

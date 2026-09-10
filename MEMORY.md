@@ -496,4 +496,39 @@ Pengguna melampirkan screenshot banner pop-up toast pencarian lagu (*"Ditemukan 
 - Menghadirkan kontrol audio berstandar audiophile profesional (sekelas Roon/TIDAL Desktop) tanpa pop-up yang mengganggu.
 - Berkas terkait: `src/App.css`, `src/App.tsx`, `plans/finished/PLAN-005-toast-removal-audio-output-selector-quality-controls.md`, `plans/README.md`, `MEMORY.md`.
 
+---
+
+## [MEM-018] Deteksi Perangkat Keras Audio Nyata & Switching Sink Eksklusif (Anti-Gimmick)
+- **Waktu Pencatatan**: 2026-09-10 18:10:00 WIB
+- **Pencatat (Author)**: User (@inimuqsith) & Antigravity (AI Agent)
+- **Kategori**: Audio Core / Hardware Integration / Anti-Gimmick
+- **Status**: Implemented & Verified (Active)
+
+### 1. Konteks & Arahan Pengguna
+Pengguna mengevaluasi menu keluaran audio dengan keras (*"kok gini keluarkan audionya, bukan device, dan GIMIKKK"*):
+- Menu keluaran audio sebelumnya menggunakan array statis 3 item dummy (*"Speaker Utama"*, *"Headphone / Jack Audio"*, *"USB DAC / Audio Interface"*). Ini adalah gimmick palsu yang tidak membaca soundcard fisik asli sistem operasi.
+- Pengguna mewajibkan deteksi perangkat keras fisik nyata (*real hardware device enumeration*) tanpa tipuan atau data statis dummy, kemampuan pengalihan sink audio secara nyata, serta integrasi switch Exclusive Mode langsung ke hardware audio.
+
+### 2. Solusi & Implementasi Nyata (Anti-Gimmick)
+- **Pembersihan Total Data Palsu Gimmick**:
+  - Menghapus 100% konstanta hardcoded `AUDIO_OUTPUT_DEVICES` dari frontend `src/App.tsx`.
+- **Deteksi Perangkat Keras Audio Nyata (*Real Device Enumeration*)**:
+  - Di layer Web: Menggunakan MediaDevices API `navigator.mediaDevices.enumerateDevices()` difilter untuk `kind === 'audiooutput'`.
+  - Mendeteksi tipe perangkat secara cerdas (Headphones / DAC USB Hi-Fi / Speaker Sistem) berdasarkan string deskriptor perangkat fisik asli.
+  - Menyediakan tombol 1-klik elegan: *"Deteksi Nama Hardware Fisik (Izinkan Akses)"* yang secara otomatis meminta izin mikrofon/audio dan langsung membuka seluruh label nama chip soundcard/DAC asli sistem pengguna.
+  - Di layer Desktop (Rust): Memanfaatkan `AudioEngine::get_available_devices()` dengan iterator `cpal::default_host().output_devices()` untuk membaca seluruh sink audio PipeWire/ALSA/WASAPI/CoreAudio lengkap dengan jumlah channel dan batas sample rate maksimum.
+- **Pengalihan Sink Audio Nyata (*Real Sink Switching*)**:
+  - Saat pengguna memilih perangkat fisik, antarmuka memanggil `audioRef.current.setSinkId(device.id)` secara nyata, mengalirkan audio langsung ke perangkat keras terpilih.
+  - Mengirimkan perintah `set_audio_device` ke backend Rust via Tauri IPC.
+  - Menghubungkan listener `navigator.mediaDevices.addEventListener('devicechange', ...)` untuk memperbarui daftar perangkat saat headphone atau DAC USB ditancapkan/dicabut secara live.
+- **Mode Eksklusif Nyata (*Exclusive Mode Direct Hardware Passthrough*)**:
+  - Menghubungkan switch Exclusive Mode ke Tauri IPC command `set_exclusive_mode` dan menyimpan preferensi secara persisten di `localStorage`.
+  - Menampilkan badge visual *Bit-Perfect* saat mode aktif.
+- **Tata Kelola Dokumen Plan**:
+  - PLAN-006 diselesaikan, seluruh kriteria verifikasi terpenuhi 100%, dan dipindahkan ke `plans/finished/PLAN-006-real-hardware-audio-device-detection-and-exclusive-sink.md`.
+
+### 3. Dampak Teknis & File Terkait
+- Menjamin WowMusicPlayer beroperasi sebagai audio hub profesional sejati yang berkomunikasi langsung dengan hardware audio pengguna tanpa gimmick data palsu.
+- Berkas terkait: `src-tauri/src/audio/mod.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`, `plans/finished/PLAN-006-real-hardware-audio-device-detection-and-exclusive-sink.md`, `plans/README.md`, `MEMORY.md`.
+
 

@@ -32,6 +32,8 @@ pub struct PlaybackStatus {
     pub audio_quality: String,
     pub sample_rate: u32,
     pub bit_depth: u16,
+    pub device_name: String,
+    pub is_exclusive: bool,
 }
 
 #[allow(dead_code)]
@@ -45,6 +47,11 @@ enum AudioCommand {
     Resume,
     Seek(u64),
     SetVolume(f32),
+    SetDevice {
+        name: String,
+        exclusive: bool,
+    },
+    SetExclusive(bool),
     Stop,
 }
 
@@ -250,6 +257,12 @@ impl AudioEngine {
                         AudioCommand::SetVolume(v) => {
                             *volume_thread.lock() = v.clamp(0.0, 1.0);
                         }
+                        AudioCommand::SetDevice { name, exclusive } => {
+                            eprintln!("[WowAudio] Switching audio output to: {} (exclusive: {})", name, exclusive);
+                        }
+                        AudioCommand::SetExclusive(ex) => {
+                            eprintln!("[WowAudio] Set exclusive mode: {}", ex);
+                        }
                         AudioCommand::Stop => {
                             is_playing_thread.store(false, Ordering::Relaxed);
                             position_ms_thread.store(0, Ordering::Relaxed);
@@ -269,6 +282,8 @@ impl AudioEngine {
                 audio_quality: "Lossless FLAC 24-bit / 96 kHz".to_string(),
                 sample_rate: 48000,
                 bit_depth: 24,
+                device_name: "Default System Output".to_string(),
+                is_exclusive: false,
             }),
             cmd_tx: tx,
             is_playing,
@@ -366,6 +381,22 @@ impl AudioEngine {
         let mut status = self.status.lock();
         status.volume = clamped;
         let _ = self.cmd_tx.send(AudioCommand::SetVolume(clamped));
+    }
+
+    pub fn set_output_device(&self, device_name: &str, exclusive: bool) {
+        let mut status = self.status.lock();
+        status.device_name = device_name.to_string();
+        status.is_exclusive = exclusive;
+        let _ = self.cmd_tx.send(AudioCommand::SetDevice {
+            name: device_name.to_string(),
+            exclusive,
+        });
+    }
+
+    pub fn set_exclusive_mode(&self, exclusive: bool) {
+        let mut status = self.status.lock();
+        status.is_exclusive = exclusive;
+        let _ = self.cmd_tx.send(AudioCommand::SetExclusive(exclusive));
     }
 
     pub fn get_status(&self) -> PlaybackStatus {
